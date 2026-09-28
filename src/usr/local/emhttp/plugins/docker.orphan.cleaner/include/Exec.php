@@ -67,7 +67,22 @@ final class Exec
         // Minimal environment: no passthrough of the calling process env.
         $environment = ['PATH' => '/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin'];
 
-        $process = @proc_open($clean, $descriptors, $pipes, null, $environment);
+        // Unraid's update_cron ships with a broken shebang ("#/bin/bash",
+        // missing the "!"), so the kernel cannot execve it directly. For an
+        // allowlisted script with no valid shebang, run it through bash. The
+        // script path is fixed and allowlisted, and no user data or command
+        // string is involved, so there is still no injection surface.
+        $launch = $clean;
+        $handle = @fopen($program, 'rb');
+        $magic = $handle !== false ? (string) fread($handle, 2) : '';
+        if ($handle !== false) {
+            fclose($handle);
+        }
+        if ($magic !== '#!') {
+            array_unshift($launch, '/bin/bash');
+        }
+
+        $process = @proc_open($launch, $descriptors, $pipes, null, $environment);
         if (!is_resource($process)) {
             throw new RuntimeException('Exec::run could not start ' . $program);
         }

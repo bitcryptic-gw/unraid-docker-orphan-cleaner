@@ -84,10 +84,13 @@ with `force=0`, `GET /system/df` and `POST /build/prune`. **The plugin never
 uses a shell.** Docker is reached only through the Engine API; logging uses
 PHP's native `syslog`; and the only external programs (`notify` and
 `update_cron`) are run through `include/Exec.php` via `proc_open` given an
-**argv array**, so no `/bin/sh` is involved and there is nothing to quote or
-inject. `Exec` allowlists the exact program path, strips NULs and caps each
-argument, passes a minimal `PATH`, closes stdin and enforces a timeout. CI
-greps `src/` to fail the build if any other process-spawning call appears.
+**argv array**, so no shell command string exists to quote or inject. `Exec`
+allowlists the exact program path, strips NULs and caps each argument, passes a
+minimal `PATH`, closes stdin and enforces a timeout. (Unraid's `update_cron`
+has a broken shebang — `#/bin/bash` with no `!` — so `Exec` runs that one fixed
+allowlisted script through `/bin/bash`; there is still no command string or
+user data involved.) CI greps `src/` to fail the build if any other
+process-spawning call appears.
 
 Deletion is never forced and always one image per API call. Per-image results
 (`deleted`, `conflict`, `not-found`, `refused`) are collected and returned.
