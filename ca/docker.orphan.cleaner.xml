@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Community Applications plugin listing entry (PluginEntry).
+
+  This file is NOT published in phase 1. It lives here for review only.
+  Phase 2 (needs Gary's explicit go-ahead) places it in the CA registration
+  repository. Not to be confused with bitcryptic-gw/unraid-templates, which is
+  the branch-protected CA hub and must not be touched directly.
+
+  Once a forum support thread exists, add a <Support> URL pointing at it (CA
+  requires a support thread before listing). TemplateURL is intentionally
+  omitted until the CA registration location is decided.
+-->
+<PluginEntry>
+  <Name>Docker Orphan Cleaner</Name>
+  <Author>bitcryptic-gw</Author>
+  <Category>Tools:Utilities System:Utilities</Category>
+  <PluginURL>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/plugin/docker.orphan.cleaner.plg</PluginURL>
+  <Support>https://github.com/bitcryptic-gw/unraid-docker-orphan-cleaner/issues</Support>
+  <Project>https://github.com/bitcryptic-gw/unraid-docker-orphan-cleaner</Project>
+  <Icon>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/src/usr/local/emhttp/plugins/docker.orphan.cleaner/images/icon.png</Icon>
+  <Overview>
+    Lists Docker images that no container references (orphan images) and lets
+    you remove them in bulk instead of one at a time. Each orphan is classified
+    by how safe it is to remove: pinned (never), referenced by a leftover
+    Unraid template, referenced by a Docker Compose stack, tagged but
+    unreferenced, or untagged. Only untagged images are selected by default,
+    deletion is always confirmed, and nothing is ever force-removed. A dry-run
+    mode shows exactly what would be deleted, child images are reported instead
+    of failing a batch, and the reclaimable build cache can be viewed and
+    pruned on request.
+  </Overview>
+  <MinVer>7.0.0</MinVer>
+</PluginEntry>

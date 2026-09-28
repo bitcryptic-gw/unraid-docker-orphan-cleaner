@@ -1,0 +1,75 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name        "docker.orphan.cleaner">
+<!ENTITY author      "bitcryptic-gw">
+<!ENTITY version     "2026.09.28">
+<!ENTITY launch      "DockerOrphanCleaner">
+<!ENTITY github      "bitcryptic-gw/unraid-docker-orphan-cleaner">
+<!ENTITY pluginURL   "https://raw.githubusercontent.com/&github;/main/plugin/&name;.plg">
+<!ENTITY packagefile "&name;-&version;-noarch-1.txz">
+<!ENTITY packageURL  "https://github.com/&github;/releases/download/v&version;/&packagefile;">
+<!ENTITY pluginLOC   "/boot/config/plugins/&name;">
+<!ENTITY emhttpLOC   "/usr/local/emhttp/plugins/&name;">
+]>
+
+<PLUGIN name="&name;"
+        author="&author;"
+        version="&version;"
+        pluginURL="&pluginURL;"
+        launch="&launch;"
+        icon="icon.png"
+        min="7.0.0"
+        support="https://github.com/&github;/issues"
+        project="https://github.com/&github;"
+        readme="https://github.com/&github;#readme">
+
+<CHANGES>
+###2026.09.28
+- First release.
+- Lists Docker images that no container references (running or stopped).
+- Classifies each orphan as pinned, template-referenced, compose-referenced,
+  tagged or untagged in that precedence order.
+- Bulk selection and deletion, one image per API call, never forced.
+- Reports child images so a refused parent does not fail the whole batch.
+- Shows the reclaimable build cache and prunes it on request.
+- Optional scheduled notify-only or untagged-only cleanup with pins and a
+  minimum age.
+</CHANGES>
+
+<!-- Ensure the flash config directory exists before the package is downloaded into it. -->
+<FILE Run="/bin/bash">
+<INLINE>
+mkdir -p &pluginLOC;
+for old in $(ls &pluginLOC;/&name;-*.txz 2>/dev/null | grep -v "&packagefile;"); do rm -f "$old"; done
+</INLINE>
+</FILE>
+
+<FILE Name="&pluginLOC;/&packagefile;" Run="upgradepkg --install-new">
+<URL>&packageURL;</URL>
+<SHA256>ab29a89593dc54a04523aea7f5ca240b57cac5a61b35185f73704e63dd8298ff</SHA256>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+update_cron
+echo ""
+echo "------------------------------------------------------"
+echo "        Docker Orphan Cleaner installed"
+echo "                 version &version;"
+echo ""
+echo "  Open it from the Tasks menu next to Docker."
+echo "------------------------------------------------------"
+echo ""
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+removepkg &name;-&version;-noarch-1 2>/dev/null || true
+rm -rf &emhttpLOC;;
+rm -rf &pluginLOC;;
+update_cron
+</INLINE>
+</FILE>
+
+</PLUGIN>

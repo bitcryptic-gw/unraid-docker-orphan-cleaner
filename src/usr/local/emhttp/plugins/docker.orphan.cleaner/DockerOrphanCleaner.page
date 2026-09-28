@@ -1,0 +1,461 @@
+Menu="Tasks:62"
+Title="Docker Orphan Cleaner"
+Icon="recycle"
+Type="xmenu"
+---
+<?php
+$docVar = $var ?? @parse_ini_file('/var/local/emhttp/var.ini');
+$docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar['csrf_token'] : '';
+?>
+<style>
+.dorphan { --doc-badge-gap: 6px; }
+.dorphan-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.dorphan-head h2 { margin:0; }
+.dorphan-status { opacity:.8; font-size:.9em; }
+.dorphan-banner { margin:12px 0; padding:10px 12px; border-radius:6px; border:1px solid var(--border-color,#3a3a3a); background:var(--background-color,#1b1b1b); }
+.dorphan-banner.error { border-color:#c0392b; color:#e74c3c; }
+.dorphan-banner.warn { border-color:#d68910; color:#e67e22; }
+.dorphan-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }
+.dorphan-bar .dorphan-spacer { flex:1 1 auto; }
+.dorphan-check { display:inline-flex; align-items:center; gap:6px; }
+.dorphan-btn { cursor:pointer; padding:6px 12px; border-radius:5px; border:1px solid var(--border-color,#3a3a3a); background:var(--alt-color,#2a2a2a); color:var(--text-color,#eee); font-size:.92em; }
+.dorphan-btn:hover { filter:brightness(1.15); }
+.dorphan-btn:disabled { opacity:.45; cursor:not-allowed; }
+.dorphan-btn.dorphan-danger { border-color:#c0392b; color:#e74c3c; }
+.dorphan-totals { display:flex; gap:20px; flex-wrap:wrap; margin:8px 0 14px; font-size:.95em; }
+.dorphan-totals b { font-weight:600; }
+.dorphan-table td, .dorphan-table th { vertical-align:middle; }
+.dorphan-badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:.82em; border:1px solid transparent; white-space:nowrap; }
+.dorphan-badge.untagged { background:rgba(46,204,113,.18); border-color:#2ecc71; color:#2ecc71; }
+.dorphan-badge.tagged { background:rgba(52,152,219,.18); border-color:#3498db; color:#3498db; }
+.dorphan-badge.compose { background:rgba(155,89,182,.18); border-color:#9b59b6; color:#9b59b6; }
+.dorphan-badge.template { background:rgba(241,196,15,.18); border-color:#f1c40f; color:#f1c40f; }
+.dorphan-badge.pinned { background:rgba(231,76,60,.18); border-color:#e74c3c; color:#e74c3c; }
+.dorphan-tags { font-family:monospace; font-size:.88em; }
+.dorphan-none { opacity:.6; font-style:italic; }
+.dorphan-settings { margin-top:22px; }
+.dorphan-settings summary { cursor:pointer; font-weight:600; padding:6px 0; }
+.dorphan-form { display:grid; grid-template-columns:220px 1fr; gap:10px 14px; align-items:start; max-width:820px; margin-top:10px; }
+.dorphan-form label { padding-top:5px; }
+.dorphan-form small { display:block; opacity:.7; margin-top:4px; }
+.dorphan-form textarea, .dorphan-form input[type=number], .dorphan-form select { width:100%; box-sizing:border-box; }
+.dorphan-form .dorphan-form-actions { grid-column:1 / -1; }
+.dorphan-modal[hidden] { display:none !important; }
+.dorphan-modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:flex; align-items:center; justify-content:center; z-index:100000; padding:20px; }
+.dorphan-modal-box { background:var(--background-color,#1b1b1b); color:var(--text-color,#eee); border:1px solid var(--border-color,#3a3a3a); border-radius:8px; max-width:640px; width:100%; max-height:80vh; display:flex; flex-direction:column; }
+.dorphan-modal-box header { padding:14px 16px; font-weight:600; border-bottom:1px solid var(--border-color,#3a3a3a); }
+.dorphan-modal-box .dorphan-modal-body { padding:14px 16px; overflow:auto; }
+.dorphan-modal-box footer { padding:12px 16px; border-top:1px solid var(--border-color,#3a3a3a); display:flex; justify-content:flex-end; gap:10px; }
+.dorphan-modal-body ul { margin:8px 0 0; padding-left:20px; }
+.dorphan-modal-body li { font-family:monospace; font-size:.88em; word-break:break-all; }
+.dorphan-status-deleted { color:#2ecc71; }
+.dorphan-status-would-delete { color:#f1c40f; }
+.dorphan-status-conflict, .dorphan-status-refused, .dorphan-status-not-found { color:#e74c3c; }
+</style>
+
+<div class="dorphan" id="dorphan">
+  <div class="dorphan-head">
+    <h2>Docker Orphan Cleaner</h2>
+    <span class="dorphan-status" id="dorphan-status">Loading&hellip;</span>
+  </div>
+
+  <div class="dorphan-banner" id="dorphan-banner" hidden></div>
+
+  <div class="dorphan-bar">
+    <label class="dorphan-check" title="When enabled nothing is deleted; the plugin reports what it would do.">
+      <input type="checkbox" id="dorphan-dryrun" checked>
+      Dry run
+    </label>
+    <span class="dorphan-spacer"></span>
+    <button type="button" class="dorphan-btn" id="dorphan-refresh">Refresh</button>
+    <button type="button" class="dorphan-btn" id="dorphan-select-untagged">Select all untagged</button>
+    <button type="button" class="dorphan-btn" id="dorphan-clear">Clear</button>
+    <button type="button" class="dorphan-btn dorphan-danger" id="dorphan-delete">Delete selected</button>
+    <button type="button" class="dorphan-btn" id="dorphan-prune">Prune build cache</button>
+  </div>
+
+  <div class="dorphan-totals" id="dorphan-totals"></div>
+
+  <table class="tablesorter dorphan-table">
+    <thead>
+      <tr>
+        <th style="width:30px"></th>
+        <th>Class</th>
+        <th>Image</th>
+        <th>Tags</th>
+        <th>Created</th>
+        <th>Size</th>
+        <th>Children</th>
+      </tr>
+    </thead>
+    <tbody id="dorphan-tbody"></tbody>
+  </table>
+
+  <div id="dorphan-results-wrap" hidden style="margin-top:22px">
+    <h3>Results</h3>
+    <table class="tablesorter">
+      <thead><tr><th>Image</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody id="dorphan-results"></tbody>
+    </table>
+  </div>
+
+  <details class="dorphan-settings" id="dorphan-settings">
+    <summary>Settings</summary>
+    <div class="dorphan-form">
+      <label for="dorphan-pins">Pin patterns</label>
+      <div>
+        <textarea id="dorphan-pins" rows="5" spellcheck="false" placeholder="postgres:*&#10;bitcryptic/mdf-server:*"></textarea>
+        <small>One glob per line (up to 50, 200 characters each). A pinned image can never be deleted here or by a scheduled run. Allowed characters: A-Z a-z 0-9 . _ / : * @ -</small>
+      </div>
+
+      <label for="dorphan-minage">Minimum age (days)</label>
+      <div>
+        <input type="number" id="dorphan-minage" min="0" max="3650" step="1">
+        <small>A scheduled delete ignores images created more recently than this.</small>
+      </div>
+
+      <label for="dorphan-schedule">Schedule</label>
+      <div>
+        <select id="dorphan-schedule">
+          <option value="off">Off</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+        </select>
+      </div>
+
+      <label for="dorphan-mode">Scheduled mode</label>
+      <div>
+        <select id="dorphan-mode">
+          <option value="notify">Notify only</option>
+          <option value="delete-untagged">Delete untagged only</option>
+        </select>
+        <small>Scheduled runs can only ever touch untagged images. Tagged, template referenced and compose referenced images are never auto-deleted.</small>
+      </div>
+
+      <label for="dorphan-buildcache">Include build cache</label>
+      <div>
+        <label class="dorphan-check"><input type="checkbox" id="dorphan-buildcache"> Prune the build cache during scheduled runs</label>
+      </div>
+
+      <div class="dorphan-form-actions">
+        <button type="button" class="dorphan-btn" id="dorphan-save">Save settings</button>
+      </div>
+    </div>
+  </details>
+
+  <div class="dorphan-modal" id="dorphan-modal" hidden>
+    <div class="dorphan-modal-box">
+      <header id="dorphan-modal-title">Confirm</header>
+      <div class="dorphan-modal-body" id="dorphan-modal-body"></div>
+      <footer>
+        <button type="button" class="dorphan-btn" id="dorphan-modal-cancel">Cancel</button>
+        <button type="button" class="dorphan-btn dorphan-danger" id="dorphan-modal-confirm">Confirm</button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var ENDPOINT = '/plugins/docker.orphan.cleaner/include/Action.php';
+  var CSRF = <?php echo json_encode($docCsrf, JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+
+  var state = { rows: [], selected: new Set(), buildCache: 0, dockerOk: false };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(text) { return text == null ? '' : String(text); }
+
+  function api(action, payload, method) {
+    var opts = { method: method || (payload ? 'POST' : 'GET'), headers: {}, credentials: 'same-origin' };
+    var url = ENDPOINT;
+    if (opts.method === 'POST') {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.headers['X-CSRF-Token'] = CSRF;
+      var body = Object.assign({ action: action, csrf: CSRF }, payload || {});
+      opts.body = JSON.stringify(body);
+    } else {
+      url += '?action=' + encodeURIComponent(action);
+    }
+    return fetch(url, opts).then(function (res) {
+      return res.text().then(function (text) {
+        var data = {};
+        try { data = text ? JSON.parse(text) : {}; }
+        catch (e) { throw new Error('Unexpected response from server (not JSON)'); }
+        if (!res.ok) {
+          var err = new Error(data.error || ('HTTP ' + res.status));
+          err.status = res.status;
+          err.data = data;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  function banner(kind, text) {
+    var el = $('dorphan-banner');
+    if (!kind) { el.hidden = true; el.textContent = ''; el.className = 'dorphan-banner'; return; }
+    el.hidden = false;
+    el.className = 'dorphan-banner ' + kind;
+    el.textContent = text;
+  }
+
+  function setStatus(text) { $('dorphan-status').textContent = text; }
+
+  function badge(cls, label) {
+    var span = document.createElement('span');
+    span.className = 'dorphan-badge ' + cls;
+    span.textContent = label;
+    return span;
+  }
+
+  function fmtDate(epoch) {
+    if (!epoch) { return 'unknown'; }
+    return new Date(epoch * 1000).toLocaleString();
+  }
+
+  function renderRows() {
+    var tbody = $('dorphan-tbody');
+    tbody.textContent = '';
+    state.rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+
+      var tdCheck = document.createElement('td');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = state.selected.has(row.id);
+      cb.setAttribute('aria-label', 'select ' + row.shortId);
+      cb.addEventListener('change', function () {
+        if (cb.checked) { state.selected.add(row.id); } else { state.selected.delete(row.id); }
+        renderTotals();
+      });
+      tdCheck.appendChild(cb);
+      tr.appendChild(tdCheck);
+
+      var tdClass = document.createElement('td');
+      var b = badge(row.class, row.classLabel);
+      if (row.reasons && row.reasons.length) { b.title = esc(row.reasons.join('; ')); }
+      tdClass.appendChild(b);
+      tr.appendChild(tdClass);
+
+      var tdId = document.createElement('td');
+      tdId.className = 'dorphan-tags';
+      tdId.textContent = row.shortId;
+      tdId.title = row.id;
+      tr.appendChild(tdId);
+
+      var tdTags = document.createElement('td');
+      tdTags.className = 'dorphan-tags';
+      if (row.tags && row.tags.length) { tdTags.textContent = row.tags.join(', '); }
+      else { tdTags.textContent = '<none>'; tdTags.classList.add('dorphan-none'); }
+      tr.appendChild(tdTags);
+
+      var tdCreated = document.createElement('td');
+      tdCreated.textContent = fmtDate(row.created);
+      tr.appendChild(tdCreated);
+
+      var tdSize = document.createElement('td');
+      tdSize.textContent = row.humanSize;
+      tr.appendChild(tdSize);
+
+      var tdChildren = document.createElement('td');
+      if (row.hasChildren) { tdChildren.textContent = 'yes (cannot be removed)'; }
+      else { tdChildren.textContent = 'no'; }
+      tr.appendChild(tdChildren);
+
+      tbody.appendChild(tr);
+    });
+    if (state.rows.length === 0) {
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = 7;
+      td.className = 'dorphan-none';
+      td.textContent = 'No orphan images found.';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+    renderTotals();
+  }
+
+  function renderTotals() {
+    var selectedSize = 0;
+    state.selected.forEach(function (id) {
+      var row = state.rows.find(function (r) { return r.id === id; });
+      if (row) { selectedSize += row.size; }
+    });
+    var totalSize = state.rows.reduce(function (sum, r) { return sum + r.size; }, 0);
+    var el = $('dorphan-totals');
+    el.textContent = '';
+    function add(label, value, strong) {
+      var wrap = document.createElement('span');
+      var b = document.createElement('b');
+      b.textContent = label + ': ';
+      wrap.appendChild(b);
+      wrap.appendChild(document.createTextNode(value));
+      if (strong) { wrap.style.fontWeight = '600'; }
+      el.appendChild(wrap);
+    }
+    add('Orphans', state.rows.length);
+    add('Reclaimable', fmtBytes(totalSize));
+    add('Selected', state.selected.size);
+    add('Selected size', fmtBytes(selectedSize));
+    add('Build cache', state.buildCache ? fmtBytes(state.buildCache) + ' reclaimable' : 'none');
+  }
+
+  function fmtBytes(bytes) {
+    bytes = Number(bytes) || 0;
+    if (bytes < 1000) { return bytes + ' B'; }
+    var units = ['kB', 'MB', 'GB', 'TB', 'PB'];
+    var v = bytes;
+    var u = 'B';
+    for (var i = 0; i < units.length; i++) { v /= 1000; u = units[i]; if (v < 1000) { break; } }
+    return v.toFixed(v < 10 ? 2 : 1) + ' ' + u;
+  }
+
+  function load() {
+    setStatus('Loading\u2026');
+    banner(null);
+    api('list', null, 'GET').then(function (data) {
+      state.rows = data.orphans || [];
+      state.buildCache = (data.buildCache && data.buildCache.reclaimable) || 0;
+      state.dockerOk = !!data.dockerOk;
+      state.selected.clear();
+      state.rows.forEach(function (r) { if (r.preselect) { state.selected.add(r.id); } });
+      applySettings(data.settings || {});
+      renderRows();
+      var t = data.totals || {};
+      setStatus(state.rows.length + ' orphan(s) of class untagged. ' + (t.count || 0) + ' total.');
+      $('dorphan-results-wrap').hidden = true;
+    }).catch(function (err) {
+      setStatus('Error');
+      banner('error', 'Could not read Docker: ' + err.message + ' (is the Docker service running?)');
+      state.rows = [];
+      renderRows();
+    });
+  }
+
+  function applySettings(settings) {
+    $('dorphan-minage').value = (settings.minAgeDays != null) ? settings.minAgeDays : 7;
+    $('dorphan-schedule').value = settings.schedule || 'off';
+    $('dorphan-mode').value = settings.scheduleMode || 'notify';
+    $('dorphan-buildcache').checked = !!settings.includeBuildCache;
+    $('dorphan-pins').value = (settings.pinPatterns || []).join('\n');
+  }
+
+  function openModal(title, bodyNodes, confirmLabel, onConfirm) {
+    $('dorphan-modal-title').textContent = title;
+    var body = $('dorphan-modal-body');
+    body.textContent = '';
+    bodyNodes.forEach(function (n) { body.appendChild(n); });
+    var confirmBtn = $('dorphan-modal-confirm');
+    confirmBtn.textContent = confirmLabel;
+    var modal = $('dorphan-modal');
+    modal.hidden = false;
+
+    function close() {
+      modal.hidden = true;
+      confirmBtn.removeEventListener('click', confirm);
+      $('dorphan-modal-cancel').removeEventListener('click', close);
+    }
+    function confirm() { close(); onConfirm(); }
+    confirmBtn.addEventListener('click', confirm);
+    $('dorphan-modal-cancel').addEventListener('click', close);
+  }
+
+  function selectedRows() {
+    return state.rows.filter(function (r) { return state.selected.has(r.id); });
+  }
+
+  function doDelete() {
+    var rows = selectedRows();
+    if (rows.length === 0) { banner('warn', 'Nothing selected.'); return; }
+    var dry = $('dorphan-dryrun').checked;
+    var p = document.createElement('p');
+    p.textContent = dry
+      ? 'Dry run: these images would be deleted and nothing will be removed.'
+      : 'The following images will be deleted. This cannot be undone.';
+    var ul = document.createElement('ul');
+    rows.forEach(function (r) {
+      var li = document.createElement('li');
+      li.textContent = (r.tags && r.tags.length ? r.tags.join(', ') : '<untagged>') + '  (' + r.humanSize + ')';
+      ul.appendChild(li);
+    });
+    openModal(dry ? 'Dry run' : 'Confirm deletion', [p, ul], dry ? 'Run dry run' : 'Delete ' + rows.length + ' image(s)', function () {
+      api('delete', { ids: rows.map(function (r) { return r.id; }), dryRun: dry }).then(function (data) {
+        showResults(data.results || []);
+        if (!dry) { load(); } else { banner(null); }
+      }).catch(function (err) {
+        banner('error', err.message);
+      });
+    });
+  }
+
+  function showResults(results) {
+    var wrap = $('dorphan-results-wrap');
+    var tbody = $('dorphan-results');
+    tbody.textContent = '';
+    results.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var tdId = document.createElement('td');
+      tdId.className = 'dorphan-tags';
+      tdId.textContent = r.id ? r.id.slice(0, 19) : '';
+      tr.appendChild(tdId);
+      var tdStatus = document.createElement('td');
+      tdStatus.className = 'dorphan-status-' + r.status;
+      tdStatus.textContent = r.status;
+      tr.appendChild(tdStatus);
+      var tdDetail = document.createElement('td');
+      tdDetail.textContent = [].concat(r.tags || []).join(', ') + (r.message ? ' - ' + r.message : '');
+      tr.appendChild(tdDetail);
+      tbody.appendChild(tr);
+    });
+    wrap.hidden = false;
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function doPrune() {
+    var p = document.createElement('p');
+    p.textContent = 'This removes the reclaimable Docker build cache. Running containers and images are not affected. Continue?';
+    openModal('Prune build cache', [p], 'Prune', function () {
+      api('prune-cache', {}).then(function (data) {
+        banner('warn', 'Build cache pruned, reclaimed ' + fmtBytes(data.reclaimed || 0) + '.');
+        load();
+      }).catch(function (err) { banner('error', err.message); });
+    });
+  }
+
+  function saveSettings() {
+    var pins = $('dorphan-pins').value.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
+    var payload = {
+      minAgeDays: parseInt($('dorphan-minage').value, 10) || 0,
+      schedule: $('dorphan-schedule').value,
+      scheduleMode: $('dorphan-mode').value,
+      includeBuildCache: $('dorphan-buildcache').checked,
+      pinPatterns: pins
+    };
+    api('save-settings', payload).then(function (data) {
+      applySettings(data.settings || {});
+      banner(null);
+      setStatus('Settings saved.');
+    }).catch(function (err) {
+      banner('error', 'Could not save settings: ' + err.message + (err.data && err.data.details ? ' (' + err.data.details.join('; ') + ')' : ''));
+    });
+  }
+
+  $('dorphan-refresh').addEventListener('click', load);
+  $('dorphan-select-untagged').addEventListener('click', function () {
+    state.rows.forEach(function (r) { if (r.class === 'untagged') { state.selected.add(r.id); } });
+    renderRows();
+  });
+  $('dorphan-clear').addEventListener('click', function () {
+    state.selected.clear();
+    renderRows();
+  });
+  $('dorphan-delete').addEventListener('click', doDelete);
+  $('dorphan-prune').addEventListener('click', doPrune);
+  $('dorphan-save').addEventListener('click', saveSettings);
+
+  load();
+})();
+</script>

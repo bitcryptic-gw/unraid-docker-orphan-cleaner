@@ -1,0 +1,70 @@
+name: lint
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck libxml2-utils
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Lint PHP includes and scripts
+        run: |
+          set -e
+          find src -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Lint the .page PHP body
+        run: |
+          set -e
+          for page in $(find src -name '*.page'); do
+            awk 'body { print } /^---$/ { body = 1 }' "$page" > /tmp/page.php
+            php -l /tmp/page.php
+          done
+
+      - name: Shellcheck
+        run: |
+          set -e
+          shellcheck build/mkpkg.sh
+
+      - name: Validate XML
+        run: |
+          set -e
+          xmllint --noout plugin/docker.orphan.cleaner.plg
+          xmllint --noout ca/docker.orphan.cleaner.xml
+
+      - name: Version matches between VERSION and the .plg
+        run: |
+          set -e
+          file_version="$(tr -d '[:space:]' < VERSION)"
+          plg_version="$(grep -oE '<!ENTITY version +"[^"]+"' plugin/docker.orphan.cleaner.plg | grep -oE '[0-9]{4}\.[0-9]{2}\.[0-9]{2}[a-z]?')"
+          echo "VERSION=$file_version plg=$plg_version"
+          test "$file_version" = "$plg_version"
+
+      - name: Rebuild package and verify the .plg SHA256 matches
+        run: |
+          set -e
+          python3 build/mkpkg.py
+          pkg="$(find build/dist -name '*.txz' | head -n1)"
+          sha="$(sha256sum "$pkg" | awk '{print $1}')"
+          grep -q "<SHA256>$sha</SHA256>" plugin/docker.orphan.cleaner.plg
+          # the committed .plg must already carry this digest
+          git diff --exit-code -- plugin/
+          echo "built $pkg sha256 $sha"
