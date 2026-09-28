@@ -228,6 +228,19 @@ try {
             }
         }
 
+        if ($dryRun) {
+            $wouldDelete = 0;
+            $refused = 0;
+            foreach ($results as $result) {
+                if (($result['status'] ?? '') === 'would-delete') {
+                    $wouldDelete++;
+                } elseif (($result['status'] ?? '') === 'refused') {
+                    $refused++;
+                }
+            }
+            Logger::log('dry-run delete: requested=' . count($ids) . ' would-delete=' . $wouldDelete . ' refused=' . $refused);
+        }
+
         doc_respond(['ok' => true, 'dryRun' => $dryRun, 'results' => $results]);
     }
 } catch (DockerApiException $e) {
