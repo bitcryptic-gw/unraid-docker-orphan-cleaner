@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026.09.29
+
+- Fix: superseded image pulls were not listed. An image that lost its tag when
+  a tag moved to a newer pull (empty `RepoTags`, still carrying `RepoDigests`)
+  is now shown as an untagged orphan, as are all other untagged images. The
+  orphan set now matches the daemon's top-level image list (what the Unraid
+  Docker page enumerates).
+- Untagged rows now show the repository from their digest (for example
+  `wordpress@sha256:abcd1234abcd`).
+- Moved to Settings > User Utilities instead of a top-level nav entry.
+- Header summary now reports per-class counts.
+- Added a fixture-based classifier test; CI runs it.
+
 ## 2026.09.28
 
 Initial release.

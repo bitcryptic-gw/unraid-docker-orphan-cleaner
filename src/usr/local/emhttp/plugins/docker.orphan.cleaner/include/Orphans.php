@@ -15,6 +15,8 @@ final class Orphan
     public $tags = [];
     /** @var array<int,string> */
     public $digests = [];
+    /** @var string repository@shortdigest shown for untagged rows */
+    public $digestLabel = '';
     /** @var string pinned|template|compose|tagged|untagged */
     public $class = 'untagged';
     /** @var string */
@@ -42,6 +44,7 @@ final class Orphan
             'shortId'     => $this->shortId,
             'tags'        => array_values($this->tags),
             'digests'     => array_values($this->digests),
+            'digestLabel' => $this->digestLabel,
             'class'       => $this->class,
             'classLabel'  => $this->classLabel,
             'preselect'   => $this->preselect,
@@ -154,7 +157,14 @@ final class Orphans
      */
     public function compute(): array
     {
-        $images = $this->api->listImages(true);
+        // Candidate set: the daemon's top-level image list (all=0), which is
+        // what the Unraid Docker page enumerates. It includes superseded pulls
+        // (no RepoTags, still carrying RepoDigests) - exactly the images a user
+        // needs to clean up. The previous digest-only exclusion hid them.
+        $candidates = $this->api->listImages(false);
+        // all=1 additionally exposes intermediate images, needed only to decide
+        // whether a candidate has children (and so will refuse to be removed).
+        $all = $this->api->listImages(true);
         $containers = $this->api->listContainers(true);
 
         $referenced = [];
@@ -164,19 +174,48 @@ final class Orphans
             }
         }
 
-        $hasChildren = $this->computeChildren($images);
-        $templateRepos = $this->templateRepositories();
-        $composeImages = $this->composeImages();
-        $pins = $this->cfg->pinPatterns;
+        $report = self::buildReport(
+            $candidates,
+            $referenced,
+            $this->computeChildren($all),
+            $this->templateRepositories(),
+            $this->composeImages(),
+            $this->cfg->pinPatterns
+        );
+        $report['buildCache'] = $this->buildCacheInfo();
+        return $report;
+    }
 
-        $now = time();
+    /**
+     * Pure classifier: no daemon or filesystem access, so it can be exercised
+     * with canned /images/json and /containers/json payloads.
+     *
+     * @param array<int,array<string,mixed>> $images        candidate images (all=0)
+     * @param array<string,bool>             $referenced    image ids in use by containers
+     * @param array<string,bool>             $children      image ids that have children
+     * @param array<string,string>           $templateRepos normalized repo:tag => file
+     * @param array<string,string>           $composeImages normalized repo:tag => file
+     * @param array<int,string>              $pins
+     * @return array<string,mixed>
+     */
+    public static function buildReport(
+        array $images,
+        array $referenced,
+        array $children,
+        array $templateRepos,
+        array $composeImages,
+        array $pins,
+        ?int $now = null
+    ): array {
+        $now = $now ?? time();
         $orphans = [];
+        $seen = [];
         $totals = [
-            'count'          => 0,
-            'size'           => 0,
-            'preselect'      => 0,
-            'preselectSize'  => 0,
-            'classes'        => [
+            'count'         => 0,
+            'size'          => 0,
+            'preselect'     => 0,
+            'preselectSize' => 0,
+            'classes'       => [
                 'pinned'   => 0,
                 'template' => 0,
                 'compose'  => 0,
@@ -187,19 +226,13 @@ final class Orphans
 
         foreach ($images as $image) {
             $id = isset($image['Id']) ? (string) $image['Id'] : '';
-            if ($id === '' || isset($referenced[$id])) {
+            if ($id === '' || isset($seen[$id]) || isset($referenced[$id])) {
                 continue;
             }
+            $seen[$id] = true;
 
             $tags = self::cleanTags((array) ($image['RepoTags'] ?? []));
             $digests = self::cleanDigests((array) ($image['RepoDigests'] ?? []));
-
-            // docker image ls hides digest-only (intermediate) images; the
-            // daemon lists them. Skip the ones the user cannot see so the
-            // orphan list matches "docker images".
-            if (count($tags) === 0 && count($digests) > 0) {
-                continue;
-            }
 
             $orphan = new Orphan();
             $orphan->id = $id;
@@ -208,10 +241,13 @@ final class Orphans
             $orphan->digests = $digests;
             $orphan->created = (int) ($image['Created'] ?? 0);
             $orphan->size = (int) ($image['Size'] ?? 0);
-            $orphan->hasChildren = isset($hasChildren[$id]);
+            $orphan->hasChildren = isset($children[$id]);
             $orphan->ageDays = $orphan->created > 0 ? (int) floor(max(0, $now - $orphan->created) / 86400) : 0;
+            if (count($tags) === 0 && count($digests) > 0) {
+                $orphan->digestLabel = self::digestLabel($digests[0]);
+            }
 
-            $this->classify($orphan, $templateRepos, $composeImages, $pins);
+            self::classifyOrphan($orphan, $templateRepos, $composeImages, $pins);
 
             $orphans[] = $orphan;
             $totals['count']++;
@@ -234,13 +270,33 @@ final class Orphans
         });
 
         return [
-            'orphans'    => array_map(static function (Orphan $o): array { return $o->toArray(); }, $orphans),
-            'totals'     => $totals,
-            'buildCache' => $this->buildCacheInfo(),
-            'templates'  => array_keys($templateRepos),
-            'compose'    => array_keys($composeImages),
-            'generated'  => $now,
+            'orphans'   => array_map(static function (Orphan $o): array { return $o->toArray(); }, $orphans),
+            'totals'    => $totals,
+            'templates' => array_keys($templateRepos),
+            'compose'   => array_keys($composeImages),
+            'generated' => $now,
         ];
+    }
+
+    /**
+     * Build a short "repository@sha256:xxxxxxxxxxxx" label from a digest, so an
+     * untagged row still tells the user what the image was.
+     */
+    public static function digestLabel(string $digest): string
+    {
+        $at = strpos($digest, '@');
+        if ($at === false) {
+            return $digest;
+        }
+        $repo = substr($digest, 0, $at);
+        $rest = substr($digest, $at + 1);
+        $colon = strpos($rest, ':');
+        if ($colon === false) {
+            return $digest;
+        }
+        $algo = substr($rest, 0, $colon);
+        $hex = substr($rest, $colon + 1);
+        return $repo . '@' . $algo . ':' . substr($hex, 0, 12);
     }
 
     /**
@@ -248,9 +304,9 @@ final class Orphans
      * @param array<string,string> $composeImages normalised repo:tag => file
      * @param array<int,string>    $pins
      */
-    private function classify(Orphan $orphan, array $templateRepos, array $composeImages, array $pins): void
+    private static function classifyOrphan(Orphan $orphan, array $templateRepos, array $composeImages, array $pins): void
     {
-        $pin = $this->matchesPin($orphan, $pins);
+        $pin = self::matchesPin($orphan, $pins);
         if ($pin !== null) {
             $orphan->class = 'pinned';
             $orphan->classLabel = 'Pinned';
@@ -259,7 +315,7 @@ final class Orphans
             return;
         }
 
-        $template = $this->matchReference($orphan->tags, $templateRepos);
+        $template = self::matchReference($orphan->tags, $templateRepos);
         if ($template !== null) {
             $orphan->class = 'template';
             $orphan->classLabel = 'Template';
@@ -268,7 +324,7 @@ final class Orphans
             return;
         }
 
-        $compose = $this->matchReference($orphan->tags, $composeImages);
+        $compose = self::matchReference($orphan->tags, $composeImages);
         if ($compose !== null) {
             $orphan->class = 'compose';
             $orphan->classLabel = 'Compose';
@@ -293,7 +349,7 @@ final class Orphans
      * @param array<int,string>    $tags
      * @param array<string,string> $references
      */
-    private function matchReference(array $tags, array $references): ?string
+    private static function matchReference(array $tags, array $references): ?string
     {
         foreach ($tags as $tag) {
             $normalised = self::normalizeRef($tag);
@@ -307,7 +363,7 @@ final class Orphans
     /**
      * @param array<int,string> $pins
      */
-    private function matchesPin(Orphan $orphan, array $pins): ?string
+    private static function matchesPin(Orphan $orphan, array $pins): ?string
     {
         if (count($pins) === 0) {
             return null;

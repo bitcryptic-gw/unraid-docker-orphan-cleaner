@@ -16,8 +16,9 @@ Plugins ▸ Install Plugin, and paste:
 https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/plugin/docker.orphan.cleaner.plg
 ```
 
-Requires Unraid 7.0.0 or newer. The plugin appears in the **Tasks** menu, next
-to Docker. Settings are on the same page.
+Requires Unraid 7.0.0 or newer. The plugin appears as a tile under
+**Settings ▸ User Utilities** (reachable from the Tools area). Settings are on
+the same page.
 
 ## What it does
 
@@ -31,7 +32,9 @@ to Docker. Settings are on the same page.
   3. **Compose** - `repo:tag` appears as an `image:` in a Docker Compose stack.
      A stack that is down makes its images look orphaned.
   4. **Tagged** - has a real tag, nothing references it.
-  5. **Untagged** - `<none>`. Ticked by default.
+  5. **Untagged** - no tag (`<none>`), whether or not it still carries a
+     repository digest. Superseded pulls (an image that lost its tag when the
+     tag moved to a newer pull) are this class. Ticked by default.
 - Shows image id, tags, created date, size and whether the image has children.
 - Deletes in bulk, one image per API call, never forced. A refused parent image
   is reported per image instead of failing the whole batch.
@@ -49,7 +52,7 @@ for the end-user view.
 ```
 plugin/docker.orphan.cleaner.plg         Unraid plugin definition (SHA256 pinned)
 src/usr/local/emhttp/plugins/docker.orphan.cleaner/
-    DockerOrphanCleaner.page             UI (Tasks menu, next to Docker)
+    DockerOrphanCleaner.page             UI (Settings > User Utilities tile)
     include/DockerApi.php                unix-socket Engine API client
     include/Orphans.php                  orphan computation + classification
     include/Action.php                   JSON endpoint: list / delete /
@@ -69,11 +72,12 @@ build/make-icon.py                       regenerates images/icon.png
 
 ### Menu placement
 
-On Unraid 7.2+ the Docker page is a top-level item in the **Tasks** navigation
-group (`Menu="Tasks:60"`), not a tab on a Docker page. A sibling entry
-(`Menu="Tasks:62"`, just after Docker and Docker Networks) is therefore the
-modern equivalent of a "Docker tab". This follows the pattern used by the
-in-CA `docker.networks` plugin (`Networks.page`, `Menu="Tasks:61"`).
+The page sets `Menu="Utilities"`, so it is listed as a tile on the
+**User Utilities** page (`Utilities.page`), under Settings, and the `.plg`
+`launch` attribute points at `Settings/DockerOrphanCleaner`. This is the same
+placement used by in-CA utility plugins such as Appdata Cleanup Plus and
+docker.networks' settings page. The plugin is deliberately **not** a top-level
+nav item.
 
 ### Docker access
 
@@ -97,11 +101,19 @@ Deletion is never forced and always one image per API call. Per-image results
 
 ### Orphan set definition
 
-The list uses `GET /images/json?all=1` minus the image IDs of every container.
-Images that have no tags but do have a repository digest are skipped: these are
-the digest-only/intermediate images that `docker image ls` hides, so the plugin
-reports the same set the user sees in the Docker UI. This makes the list equal
-to `docker images -q --no-trunc` minus the container image IDs.
+The candidate set is the daemon's top-level image list, `GET /images/json?all=0`
+— the images the Unraid Docker page enumerates — minus the image IDs of every
+container. `all=1` is fetched separately only to work out the child/parent flag.
+
+An image with empty `RepoTags` is **untagged**, whether or not it still carries
+`RepoDigests`. This is what surfaces superseded pulls: when a tag moves to a
+newer pull, the old image keeps its `RepoDigests`, loses its tag, and is exactly
+what a user needs to clean up. (`docker images` hides digest-only images unless
+run with `-a`, so on some Docker versions `all=0` equals `docker images -a`
+rather than plain `docker images`; the Unraid Docker page uses the daemon's
+list, so the plugin matches that.) One row is produced per image ID, even when
+the image has several digests; untagged rows show `repository@sha256:<short>` so
+the user can tell what the image was.
 
 ## Security
 

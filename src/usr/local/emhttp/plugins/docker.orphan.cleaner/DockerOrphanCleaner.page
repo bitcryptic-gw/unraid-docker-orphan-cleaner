@@ -1,4 +1,4 @@
-Menu="Tasks:62"
+Menu="Utilities"
 Title="Docker Orphan Cleaner"
 Icon="recycle"
 Type="xmenu"
@@ -248,6 +248,7 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
       var tdTags = document.createElement('td');
       tdTags.className = 'dorphan-tags';
       if (row.tags && row.tags.length) { tdTags.textContent = row.tags.join(', '); }
+      else if (row.digestLabel) { tdTags.textContent = row.digestLabel; tdTags.title = (row.digests || []).join('\n'); }
       else { tdTags.textContent = '<none>'; tdTags.classList.add('dorphan-none'); }
       tr.appendChild(tdTags);
 
@@ -325,7 +326,16 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
       applySettings(data.settings || {});
       renderRows();
       var t = data.totals || {};
-      setStatus(state.rows.length + ' orphan(s) of class untagged. ' + (t.count || 0) + ' total.');
+      var c = t.classes || {};
+      var total = t.count || 0;
+      var parts = [
+        (c.untagged || 0) + ' untagged',
+        (c.tagged || 0) + ' tagged',
+        (c.template || 0) + ' template'
+      ];
+      if (c.compose) { parts.push(c.compose + ' compose'); }
+      if (c.pinned) { parts.push(c.pinned + ' pinned'); }
+      setStatus(total + ' orphan' + (total === 1 ? '' : 's') + ': ' + parts.join(', '));
       $('dorphan-results-wrap').hidden = true;
     }).catch(function (err) {
       setStatus('Error');
@@ -378,7 +388,8 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
     var ul = document.createElement('ul');
     rows.forEach(function (r) {
       var li = document.createElement('li');
-      li.textContent = (r.tags && r.tags.length ? r.tags.join(', ') : '<untagged>') + '  (' + r.humanSize + ')';
+      var label = (r.tags && r.tags.length) ? r.tags.join(', ') : (r.digestLabel || '<untagged>');
+      li.textContent = label + '  (' + r.humanSize + ')';
       ul.appendChild(li);
     });
     openModal(dry ? 'Dry run' : 'Confirm deletion', [p, ul], dry ? 'Run dry run' : 'Delete ' + rows.length + ' image(s)', function () {

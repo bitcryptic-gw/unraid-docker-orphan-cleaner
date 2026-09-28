@@ -4,8 +4,8 @@ Unraid plugin that lists Docker images no container references, classifies how
 safe each one is to remove, and deletes the selected images in bulk. Unraid
 only removes orphan images one at a time.
 
-Open it from the **Tasks** menu, next to Docker. Settings live under the
-Settings section on the same page.
+Open it from **Settings ▸ User Utilities** (a tile, reachable from the Tools
+area). Settings live in the Settings section on the same page.
 
 ## What is an orphan?
 
@@ -18,7 +18,7 @@ Each orphan is classified, in this precedence order:
 | Template | `repo:tag` matches a `<Repository>` in a `templates-user` XML | no |
 | Compose | `repo:tag` appears as an `image:` in a Docker Compose stack | no |
 | Tagged | Has a real tag, nothing references it | no |
-| Untagged | `<none>` image | yes |
+| Untagged | No tag (`<none>`), with or without a repo digest. Includes superseded pulls | yes |
 
 Deletion is never forced. Docker refuses to remove a parent image while a child
 exists; that refusal is reported for the image rather than failing the batch.

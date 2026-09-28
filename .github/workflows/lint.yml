@@ -29,7 +29,12 @@ jobs:
       - name: Lint PHP includes and scripts
         run: |
           set -e
-          find src -name '*.php' -print0 | xargs -0 -n1 php -l
+          find src tests -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Classifier unit test
+        run: |
+          set -e
+          php tests/classifier_test.php
 
       - name: Lint the .page PHP body
         run: |
