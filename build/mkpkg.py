@@ -9,13 +9,13 @@ file. The CI lint job relies on that: it rebuilds and checks the committed
 Run via build/mkpkg.sh.
 """
 import hashlib
+import io
 import lzma
 import os
+import re
 import shutil
-import stat
 import sys
 import tarfile
-import io
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NAME = "docker.orphan.cleaner"
@@ -111,9 +111,11 @@ def stamp(pkgname, txz):
         digest = hashlib.sha256(fh.read()).hexdigest()
     with open(PLG) as fh:
         text = fh.read()
-    new = text.replace(PLACEHOLDER, digest)
-    if new == text and digest not in text:
-        print("ERROR: no SHA256 placeholder found in " + PLG, file=sys.stderr)
+    # Accept either the build placeholder or an existing 64-char hex digest.
+    pattern = re.compile(r"(<SHA256>)(?:@@SHA256@@|[0-9a-fA-F]{64})(</SHA256>)")
+    new, count = pattern.subn(lambda m: m.group(1) + digest + m.group(2), text)
+    if count != 1:
+        print("ERROR: expected exactly one <SHA256> element in " + PLG, file=sys.stderr)
         sys.exit(1)
     with open(PLG, "w") as fh:
         fh.write(new)

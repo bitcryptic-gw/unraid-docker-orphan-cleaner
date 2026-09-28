@@ -199,12 +199,13 @@ final class Config
 
     private static function updateCron(): void
     {
-        foreach (['/usr/local/sbin/update_cron', '/usr/local/emhttp/webGui/scripts/update_cron'] as $path) {
-            if (is_file($path)) {
-                @exec(escapeshellarg($path));
-                return;
-            }
+        // The plugin's only shell call. update_cron takes no arguments, so each
+        // invocation below is a fixed-argument call with no variables and no
+        // injection surface. Unraid 7.x ships it in /usr/local/sbin.
+        if (is_file('/usr/local/sbin/update_cron')) {
+            @exec('/usr/local/sbin/update_cron');
+        } elseif (is_file('/usr/local/emhttp/webGui/scripts/update_cron')) {
+            @exec('/usr/local/emhttp/webGui/scripts/update_cron');
         }
-        @exec('update_cron');
     }
 }

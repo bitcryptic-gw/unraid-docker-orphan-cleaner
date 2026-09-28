@@ -79,10 +79,12 @@ in-CA `docker.networks` plugin (`Networks.page`, `Menu="Tasks:61"`).
 All Docker operations go through the Engine API over `/var/run/docker.sock`
 using PHP curl with `CURLOPT_UNIX_SOCKET_PATH`. `GET /images/json`,
 `GET /containers/json?all=1`, `GET /images/{id}/json`, `DELETE /images/{id}`
-with `force=0`, `GET /system/df` and `POST /build/prune`. **No `exec`,
-`shell_exec` or backticks are used for Docker operations.** Shell is used only
-for `logger` and `update_cron`, with fixed arguments and every variable wrapped
-in `escapeshellarg`.
+with `force=0`, `GET /system/df` and `POST /build/prune`. **The plugin makes no
+shell calls except one.** Docker is never reached through a shell; logging uses
+PHP's native `syslog`, and notifications are written directly into Unraid's
+notification store (`include/Notify.php`). The single remaining shell call is
+`update_cron` in `Config::writeCron()`, invoked with a literal path and no
+arguments, so there is no variable and no injection surface.
 
 Deletion is never forced and always one image per API call. Per-image results
 (`deleted`, `conflict`, `not-found`, `refused`) are collected and returned.

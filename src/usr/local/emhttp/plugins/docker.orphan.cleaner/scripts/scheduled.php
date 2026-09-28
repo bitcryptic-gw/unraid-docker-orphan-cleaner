@@ -9,8 +9,8 @@ declare(strict_types=1);
  * compose referenced images are never removed by a scheduled run, whatever
  * the settings say. Pins and the minimum age are always respected.
  *
- * Notifications go through Unraid's notify helper; every variable passed to a
- * shell command is escaped with escapeshellarg.
+ * Notifications are written straight into Unraid's notification store (see
+ * include/Notify.php); no shell command is used anywhere in this plugin.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -22,6 +22,7 @@ require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Config.php
 require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/DockerApi.php';
 require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Orphans.php';
 require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Logger.php';
+require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Notify.php';
 
 /**
  * @param array<int,string> $lines
@@ -35,20 +36,9 @@ function doc_syslog(array $lines): void
 
 function doc_notify(string $subject, string $description, string $importance, string $message = ''): void
 {
-    $script = '/usr/local/emhttp/webGui/scripts/notify';
-    if (!is_file($script)) {
-        Logger::log('notify helper missing; ' . $subject . ' - ' . $description);
-        return;
+    if (!Notify::send('Docker Orphan Cleaner', $subject, $description, $importance, $message)) {
+        Logger::log('could not write notification; ' . $subject . ' - ' . $description);
     }
-    $command = escapeshellarg($script)
-        . ' -e ' . escapeshellarg('Docker Orphan Cleaner')
-        . ' -s ' . escapeshellarg($subject)
-        . ' -d ' . escapeshellarg($description)
-        . ' -i ' . escapeshellarg($importance);
-    if ($message !== '') {
-        $command .= ' -m ' . escapeshellarg($message);
-    }
-    @exec($command);
 }
 
 $cfg = Config::load();

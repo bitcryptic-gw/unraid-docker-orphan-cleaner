@@ -55,12 +55,18 @@ function doc_csrf_token(): string
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
-$rawBody = file_get_contents('php://input');
+// Reject a declared oversized body before reading any of it.
+if (isset($_SERVER['CONTENT_LENGTH']) && (int) $_SERVER['CONTENT_LENGTH'] > DOC_MAX_BODY_BYTES) {
+    doc_respond(['error' => 'request body too large'], 413);
+}
+
+// Read at most one byte past the cap, so a chunked body (or one with no, or an
+// untrue, Content-Length) cannot force the endpoint to buffer it all.
+$rawBody = file_get_contents('php://input', false, null, 0, DOC_MAX_BODY_BYTES + 1);
 if ($rawBody === false) {
     $rawBody = '';
 }
-$contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : strlen($rawBody);
-if ($contentLength > DOC_MAX_BODY_BYTES) {
+if (strlen($rawBody) > DOC_MAX_BODY_BYTES) {
     doc_respond(['error' => 'request body too large'], 413);
 }
 
