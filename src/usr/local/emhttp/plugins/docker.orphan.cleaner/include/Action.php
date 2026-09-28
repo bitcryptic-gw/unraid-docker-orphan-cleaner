@@ -10,7 +10,7 @@ declare(strict_types=1);
  *   POST that does not carry a valid csrf_token (POST field or X-CSRF-Token
  *   header) and consumes that token. Because of that, this endpoint performs
  *   its own hash_equals() check against a *separate* token carried in the
- *   JSON body (`csrf`), so an explicit server side check is still performed.
+ *   JSON body (the csrf field), so an explicit server side check is still performed.
  * - State changing actions are POST only. GET is refused for them.
  * - Request bodies larger than 64 KiB are refused.
  * - Image IDs must be exact sha256 digests and there can be at most 200.

@@ -9,8 +9,8 @@ declare(strict_types=1);
  * compose referenced images are never removed by a scheduled run, whatever
  * the settings say. Pins and the minimum age are always respected.
  *
- * Notifications are written straight into Unraid's notification store (see
- * include/Notify.php); no shell command is used anywhere in this plugin.
+ * Notifications go through Unraid's own notify helper, run shell-free via
+ * include/Exec.php (an argv array, no /bin/sh). No shell is used anywhere.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -22,7 +22,7 @@ require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Config.php
 require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/DockerApi.php';
 require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Orphans.php';
 require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Logger.php';
-require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Notify.php';
+require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Exec.php';
 
 /**
  * @param array<int,string> $lines
@@ -36,8 +36,24 @@ function doc_syslog(array $lines): void
 
 function doc_notify(string $subject, string $description, string $importance, string $message = ''): void
 {
-    if (!Notify::send('Docker Orphan Cleaner', $subject, $description, $importance, $message)) {
-        Logger::log('could not write notification; ' . $subject . ' - ' . $description);
+    $argv = [
+        '/usr/local/emhttp/webGui/scripts/notify',
+        '-e', 'Docker Orphan Cleaner',
+        '-s', $subject,
+        '-d', $description,
+        '-i', $importance,
+    ];
+    if ($message !== '') {
+        $argv[] = '-m';
+        $argv[] = $message;
+    }
+    try {
+        $result = Exec::run($argv);
+        if ($result['code'] !== 0) {
+            Logger::log('notify exited ' . $result['code'] . ': ' . trim($result['err']));
+        }
+    } catch (Throwable $e) {
+        Logger::log('notify failed: ' . $e->getMessage());
     }
 }
 

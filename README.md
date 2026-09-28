@@ -56,6 +56,7 @@ src/usr/local/emhttp/plugins/docker.orphan.cleaner/
                                          prune-cache / save-settings
     include/Config.php                   settings load / validate / save
     include/Logger.php                   syslog helper
+    include/Exec.php                     shell-free external process helper
     scripts/scheduled.php                cron entry point
     images/icon.png                      plugin icon
     README.md
@@ -79,12 +80,14 @@ in-CA `docker.networks` plugin (`Networks.page`, `Menu="Tasks:61"`).
 All Docker operations go through the Engine API over `/var/run/docker.sock`
 using PHP curl with `CURLOPT_UNIX_SOCKET_PATH`. `GET /images/json`,
 `GET /containers/json?all=1`, `GET /images/{id}/json`, `DELETE /images/{id}`
-with `force=0`, `GET /system/df` and `POST /build/prune`. **The plugin makes no
-shell calls except one.** Docker is never reached through a shell; logging uses
-PHP's native `syslog`, and notifications are written directly into Unraid's
-notification store (`include/Notify.php`). The single remaining shell call is
-`update_cron` in `Config::writeCron()`, invoked with a literal path and no
-arguments, so there is no variable and no injection surface.
+with `force=0`, `GET /system/df` and `POST /build/prune`. **The plugin never
+uses a shell.** Docker is reached only through the Engine API; logging uses
+PHP's native `syslog`; and the only external programs (`notify` and
+`update_cron`) are run through `include/Exec.php` via `proc_open` given an
+**argv array**, so no `/bin/sh` is involved and there is nothing to quote or
+inject. `Exec` allowlists the exact program path, strips NULs and caps each
+argument, passes a minimal `PATH`, closes stdin and enforces a timeout. CI
+greps `src/` to fail the build if any other process-spawning call appears.
 
 Deletion is never forced and always one image per API call. Per-image results
 (`deleted`, `conflict`, `not-found`, `refused`) are collected and returned.

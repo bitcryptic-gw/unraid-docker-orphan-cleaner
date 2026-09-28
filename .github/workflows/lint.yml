@@ -39,6 +39,27 @@ jobs:
             php -l /tmp/page.php
           done
 
+      - name: Audit for shell calls in src
+        run: |
+          set -e
+          forbidden='(^|[^A-Za-z0-9_])(exec|shell_exec|system|passthru|popen|pcntl_exec)[[:space:]]*\(|escapeshell(arg|cmd)|`'
+          if grep -rInE --include='*.php' --include='*.page' "$forbidden" src/; then
+            echo "::error::forbidden shell call found in src/"
+            exit 1
+          fi
+          proc_files="$(grep -rIl 'proc_open' --include='*.php' --include='*.page' src/ | sort | tr '\n' ' ')"
+          expected="src/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Exec.php "
+          if [ "$proc_files" != "$expected" ]; then
+            echo "::error::proc_open must appear only in include/Exec.php (found: ${proc_files:-none})"
+            exit 1
+          fi
+          calls="$(grep -rIohE 'proc_open[[:space:]]*\(' --include='*.php' --include='*.page' src/ | wc -l | tr -d ' ')"
+          if [ "$calls" != "1" ]; then
+            echo "::error::expected exactly one proc_open call in src/ (found $calls)"
+            exit 1
+          fi
+          echo "OK: no forbidden shell calls; single proc_open call is in include/Exec.php"
+
       - name: Shellcheck
         run: |
           set -e

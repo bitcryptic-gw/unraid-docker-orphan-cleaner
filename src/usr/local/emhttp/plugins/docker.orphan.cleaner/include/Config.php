@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/Exec.php';
+
 /**
  * Plugin settings.
  *
@@ -199,13 +201,18 @@ final class Config
 
     private static function updateCron(): void
     {
-        // The plugin's only shell call. update_cron takes no arguments, so each
-        // invocation below is a fixed-argument call with no variables and no
-        // injection surface. Unraid 7.x ships it in /usr/local/sbin.
-        if (is_file('/usr/local/sbin/update_cron')) {
-            @exec('/usr/local/sbin/update_cron');
-        } elseif (is_file('/usr/local/emhttp/webGui/scripts/update_cron')) {
-            @exec('/usr/local/emhttp/webGui/scripts/update_cron');
+        // Run Unraid's update_cron shell-free (argv array, no /bin/sh). Unraid
+        // 7.x ships it in /usr/local/sbin; older layouts used the webGui path.
+        $candidates = ['/usr/local/sbin/update_cron', '/usr/local/emhttp/webGui/scripts/update_cron'];
+        foreach ($candidates as $path) {
+            if (is_file($path)) {
+                try {
+                    Exec::run([$path]);
+                } catch (Throwable $e) {
+                    // Nothing useful to do here; the cron fragment is still on flash.
+                }
+                return;
+            }
         }
     }
 }

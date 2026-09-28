@@ -196,7 +196,7 @@ final class Orphans
 
             // docker image ls hides digest-only (intermediate) images; the
             // daemon lists them. Skip the ones the user cannot see so the
-            // orphan list matches `docker images`.
+            // orphan list matches "docker images".
             if (count($tags) === 0 && count($digests) > 0) {
                 continue;
             }
