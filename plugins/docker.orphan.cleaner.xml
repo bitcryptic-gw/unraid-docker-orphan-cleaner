@@ -10,10 +10,12 @@
 
   The <PluginURL> here must match the pluginURL attribute in the .plg exactly.
 
-  Screenshots are optional and are omitted for now; Gary can add <Screenshot>
-  entries later once they are captured and hosted. For a separate-repo
-  submission this file is copied to plugins/docker.orphan.cleaner.xml (starter
-  layout).
+  Lives at plugins/docker.orphan.cleaner.xml, the layout the maintained CA
+  starter repository uses, so this repository can be submitted directly at
+  https://ca.unraid.net/submit/new.
+
+  Screenshots are optional and are omitted for now; <Screenshot> entries can be
+  added later once they are captured and hosted.
 -->
 <Plugin>
   <Name>Docker Orphan Cleaner</Name>

@@ -95,7 +95,8 @@ jobs:
         run: |
           set -e
           xmllint --noout plugin/docker.orphan.cleaner.plg
-          xmllint --noout ca/docker.orphan.cleaner.xml
+          xmllint --noout plugins/docker.orphan.cleaner.xml
+          xmllint --noout ca_profile.xml
 
       - name: VERSION format
         run: |
