@@ -14,8 +14,8 @@ Docker Orphan Cleaner lists every orphan in one place, classifies how safe each
 one is to delete, and removes the selected images in bulk. It also reports the
 reclaimable build cache and can prune it on request.
 
-It is deliberately conservative. Nothing is force-removed, every deletion is
-confirmed, and a scheduled run only ever deletes untagged images.
+It is deliberately conservative. Nothing is force-removed, every manual deletion
+is confirmed, and a scheduled run only ever deletes untagged images.
 
 ## How images are classified
 
@@ -74,6 +74,7 @@ It appears as a tile under **Settings ▸ User Utilities**. Settings (pins,
 minimum age, schedule) are on the same page.
 
 **Requires Unraid 7.0.0 or newer.**
+**(tested on 7.3.2)**
 
 ## Source and issues
 
