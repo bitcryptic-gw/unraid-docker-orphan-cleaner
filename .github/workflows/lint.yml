@@ -59,11 +59,11 @@ jobs:
             exit 1
           fi
           calls="$(grep -rIohE 'proc_open[[:space:]]*\(' --include='*.php' --include='*.page' src/ | wc -l | tr -d ' ')"
-          if [ "$calls" != "1" ]; then
-            echo "::error::expected exactly one proc_open call in src/ (found $calls)"
+          if [ "$calls" -lt 1 ]; then
+            echo "::error::no proc_open call found in src/"
             exit 1
           fi
-          echo "OK: no forbidden shell calls; single proc_open call is in include/Exec.php"
+          echo "OK: no forbidden shell calls; proc_open appears only in include/Exec.php ($calls call(s))"
 
       - name: Shellcheck
         run: |

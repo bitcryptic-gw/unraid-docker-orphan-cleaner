@@ -11,15 +11,78 @@ declare(strict_types=1);
  */
 final class Exec
 {
-    /** Absolute paths the helper is permitted to run. */
+    /** Absolute paths Exec::run() is permitted to run. */
     private const ALLOWED = [
         '/usr/local/emhttp/webGui/scripts/notify',
         '/usr/local/sbin/update_cron',
         '/usr/local/emhttp/webGui/scripts/update_cron',
     ];
 
+    /** The one detached worker recipe Exec::spawnDetached() will launch. */
+    public const PRUNE_WORKER = '/usr/local/emhttp/plugins/docker.orphan.cleaner/scripts/prune.php';
+    private const PHP_BINARY = '/usr/bin/php';
+    private const SETSID_BINARY = '/usr/bin/setsid';
+
     private const MAX_ARG_LENGTH = 2000;
     private const DEFAULT_TIMEOUT = 30;
+
+    /**
+     * The fixed argv that launches the detached build-cache prune worker.
+     * setsid -f puts the worker in its own session so it survives the web
+     * request; it forks and exits, so the spawn returns immediately.
+     *
+     * @return array<int,string>
+     */
+    public static function pruneArgv(): array
+    {
+        return [self::SETSID_BINARY, '-f', self::PHP_BINARY, self::PRUNE_WORKER];
+    }
+
+    /**
+     * Launch a process detached from the current request and return at once.
+     * Only the fixed prune-worker argv is accepted; stdio goes to /dev/null and
+     * setsid -f reparents the worker so nothing waits on it.
+     *
+     * @param array<int,string> $argv
+     */
+    public static function spawnDetached(array $argv): void
+    {
+        if (!function_exists('proc_open')) {
+            throw new RuntimeException('proc_open is not available');
+        }
+        $argv = array_values($argv);
+        // /usr/bin/setsid is permitted only as the prefix of this exact recipe.
+        if ($argv !== self::pruneArgv()) {
+            throw new InvalidArgumentException('Exec::spawnDetached refuses this argv');
+        }
+
+        $clean = [];
+        foreach ($argv as $argument) {
+            if (!is_string($argument)) {
+                throw new InvalidArgumentException('Exec::spawnDetached arguments must be strings');
+            }
+            $argument = str_replace("\0", '', $argument);
+            if (strlen($argument) > self::MAX_ARG_LENGTH) {
+                $argument = substr($argument, 0, self::MAX_ARG_LENGTH);
+            }
+            $clean[] = $argument;
+        }
+
+        $descriptors = [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['file', '/dev/null', 'w'],
+            2 => ['file', '/dev/null', 'w'],
+        ];
+        $environment = ['PATH' => '/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin'];
+
+        $process = @proc_open($clean, $descriptors, $pipes, null, $environment);
+        if (!is_resource($process)) {
+            throw new RuntimeException('Exec::spawnDetached could not start the prune worker');
+        }
+        // setsid -f forks and its parent exits immediately, so this does not
+        // wait for the worker itself.
+        @proc_close($process);
+    }
 
     /**
      * @param array<int,string> $argv full argv, $argv[0] is the program

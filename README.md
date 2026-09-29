@@ -60,7 +60,9 @@ src/usr/local/emhttp/plugins/docker.orphan.cleaner/
     include/Config.php                   settings load / validate / save
     include/Logger.php                   syslog helper
     include/Exec.php                     shell-free external process helper
+    include/Pruner.php                   prune lock + status bookkeeping
     scripts/scheduled.php                cron entry point
+    scripts/prune.php                    detached build-cache prune worker
     images/icon.png                      plugin icon
     README.md
 ca/docker.orphan.cleaner.xml             CA listing entry (not published)
@@ -95,6 +97,15 @@ has a broken shebang — `#/bin/bash` with no `!` — so `Exec` runs that one fi
 allowlisted script through `/bin/bash`; there is still no command string or
 user data involved.) CI greps `src/` to fail the build if any other
 process-spawning call appears.
+
+**Build-cache prune is asynchronous.** A large `POST /build/prune` runs for
+minutes and returns nothing until it finishes, which exceeds nginx's
+`fastcgi_read_timeout` and would tie up an FPM worker. So `action=prune-cache`
+refuses a second prune (`409` while one runs), launches a detached worker
+(`scripts/prune.php`, via `Exec::spawnDetached()` → `setsid -f /usr/bin/php …`,
+stdio to `/dev/null`) and returns `{"started":true}`. The worker holds an
+`flock` and writes progress to `/tmp/docker.orphan.cleaner/prune.status`; the UI
+polls `action=prune-status` and shows "Pruning… / Done: X / Failed".
 
 Deletion is never forced and always one image per API call. Per-image results
 (`deleted`, `conflict`, `not-found`, `refused`) are collected and returned.

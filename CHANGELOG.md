@@ -14,6 +14,11 @@ deleted, 7.34 GB freed).
   `SharedSize` of `-1`/missing falls back to showing only Size.
 - Plugins-page `README.md` reformatted to the Unraid convention (bold name line
   + one sentence), matching Community Applications / Fix Common Problems.
+- Build-cache prune is now asynchronous: the action launches a detached worker
+  (`scripts/prune.php`) with its own 900 s timeout, returns immediately, refuses
+  a second prune while one is running, and the UI polls `prune-status` until it
+  reports the reclaimed space. Fixes the 30 s socket-timeout error on large
+  caches (899 entries / 83 GB on unraid-syd).
 - Same-day builds use a zero-padded dot counter (`2026.09.29.01`, `.02`, …).
   Zero-padding is deliberate: Unraid's plugin manager compares versions with
   `strcmp`, so `.10` must sort after `.09`.

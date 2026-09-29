@@ -42,10 +42,11 @@ final class DockerApi
      * Perform a single request against the Engine API.
      *
      * @param array<int,string> $headers
+     * @param int|null          $timeout per-call timeout in seconds; null uses the instance default
      * @return array{status:int,json:mixed,raw:string}
      * @throws DockerApiException
      */
-    public function request(string $method, string $path, ?string $body = null, array $headers = []): array
+    public function request(string $method, string $path, ?string $body = null, array $headers = [], ?int $timeout = null): array
     {
         if (!function_exists('curl_init')) {
             throw new DockerApiException('php curl extension is not available');
@@ -62,7 +63,7 @@ final class DockerApi
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER => false,
             CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_TIMEOUT => ($timeout !== null && $timeout > 0) ? $timeout : $this->timeout,
             CURLOPT_HTTPHEADER => $headerLines,
         ]);
         if ($body !== null) {
@@ -137,11 +138,15 @@ final class DockerApi
     }
 
     /**
+     * Prune the build cache. On a large cache this runs for minutes and sends
+     * no bytes until it finishes, so it gets its own long timeout instead of
+     * the short instance default used by list/inspect/df/single-delete.
+     *
      * @return array<string,mixed>
      */
-    public function pruneBuildCache(): array
+    public function pruneBuildCache(int $timeoutSec = 900): array
     {
-        $result = $this->request('POST', '/build/prune', '{}');
+        $result = $this->request('POST', '/build/prune', '{}', [], $timeoutSec);
         return is_array($result['json']) ? $result['json'] : [];
     }
 

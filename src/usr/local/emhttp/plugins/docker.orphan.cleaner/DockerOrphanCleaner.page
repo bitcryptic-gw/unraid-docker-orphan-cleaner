@@ -455,14 +455,69 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
     wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  var pruneTimer = null;
+
+  function pruneButton(running) {
+    var btn = $('dorphan-prune');
+    if (!btn) { return; }
+    btn.disabled = !!running;
+    btn.textContent = running ? 'Pruning\u2026' : 'Prune build cache';
+  }
+
+  function pollPruneStatus() {
+    if (pruneTimer) { clearTimeout(pruneTimer); pruneTimer = null; }
+    api('prune-status', null, 'GET').then(function (s) {
+      var st = s.state || 'idle';
+      if (st === 'running' || st === 'starting') {
+        pruneButton(true);
+        setStatus('Pruning build cache\u2026');
+        pruneTimer = setTimeout(pollPruneStatus, 3000);
+      } else {
+        pruneButton(false);
+        if (st === 'done') {
+          banner('warn', 'Build cache pruned, reclaimed ' + fmtBytes(s.reclaimed || 0) + '.');
+          setStatus('Prune complete.');
+          load();
+        } else if (st === 'failed') {
+          banner('error', 'Prune failed: ' + (s.message || 'unknown error'));
+          setStatus('Prune failed.');
+        }
+      }
+    }).catch(function (err) {
+      pruneButton(false);
+      banner('error', 'Could not read prune status: ' + err.message);
+    });
+  }
+
+  function syncPruneButton() {
+    api('prune-status', null, 'GET').then(function (s) {
+      var st = s.state || 'idle';
+      if (st === 'running' || st === 'starting') {
+        pruneButton(true);
+        pollPruneStatus();
+      } else {
+        pruneButton(false);
+      }
+    }).catch(function () { /* leave the button as-is */ });
+  }
+
   function doPrune() {
     var p = document.createElement('p');
     p.textContent = 'This removes the reclaimable Docker build cache. Running containers and images are not affected. Continue?';
     openModal('Prune build cache', [p], 'Prune', function () {
-      api('prune-cache', {}).then(function (data) {
-        banner('warn', 'Build cache pruned, reclaimed ' + fmtBytes(data.reclaimed || 0) + '.');
-        load();
-      }).catch(function (err) { banner('error', err.message); });
+      api('prune-cache', {}).then(function () {
+        banner('warn', 'Build cache prune started\u2026');
+        pruneButton(true);
+        pollPruneStatus();
+      }).catch(function (err) {
+        if (err.status === 409) {
+          banner('warn', 'A prune is already running.');
+          pruneButton(true);
+          pollPruneStatus();
+        } else {
+          banner('error', err.message);
+        }
+      });
     });
   }
 
@@ -498,5 +553,6 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   $('dorphan-save').addEventListener('click', saveSettings);
 
   load();
+  syncPruneButton();
 })();
 </script>

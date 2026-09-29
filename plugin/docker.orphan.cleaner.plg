@@ -33,6 +33,11 @@
   figure is not overstated by shared layers.
 - Plugins page entry reformatted to the Unraid convention (bold name line plus
   one sentence).
+- Build cache prune is now asynchronous. A large prune ran for minutes and
+  returned nothing until it finished, hitting the 30 s socket timeout (and the
+  nginx request timeout). The action now refuses a second prune, launches a
+  detached worker with its own 900 s timeout, returns immediately, and the UI
+  polls progress until it reports the reclaimed space.
 - Same-day builds now use a dot counter (2026.09.29.01, .02, ...). Note: Unraid
   compares plugin versions with strcmp, so the counter is zero-padded.
 
@@ -69,7 +74,7 @@ for old in $(ls &pluginLOC;/&name;-*.txz 2>/dev/null | grep -v "&packagefile;");
 
 <FILE Name="&pluginLOC;/&packagefile;" Run="upgradepkg --install-new">
 <URL>&packageURL;</URL>
-<SHA256>b827999149010525d533138e0a17cb01df87a07b0f37ad6f5a583412ca05a9ed</SHA256>
+<SHA256>c18219a9a10a888db6197d9ff269bf4783accf87809c86eb146cd24a97e72df1</SHA256>
 </FILE>
 
 <FILE Run="/bin/bash">

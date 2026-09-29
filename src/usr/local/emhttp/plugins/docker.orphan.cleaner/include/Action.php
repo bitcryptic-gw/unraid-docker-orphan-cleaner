@@ -22,10 +22,12 @@ require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/DockerApi.php';
 require_once __DIR__ . '/Orphans.php';
 require_once __DIR__ . '/Logger.php';
+require_once __DIR__ . '/Exec.php';
+require_once __DIR__ . '/Pruner.php';
 
 const DOC_MAX_BODY_BYTES = 65536;
 const DOC_MAX_IDS        = 200;
-const DOC_ACTIONS        = ['list', 'delete', 'prune-cache', 'save-settings'];
+const DOC_ACTIONS        = ['list', 'delete', 'prune-cache', 'prune-status', 'save-settings'];
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -90,7 +92,7 @@ if (!in_array($action, DOC_ACTIONS, true)) {
     doc_respond(['error' => 'unknown action'], 400);
 }
 
-$readOnly = ($action === 'list');
+$readOnly = ($action === 'list' || $action === 'prune-status');
 if ($readOnly) {
     if ($method !== 'GET' && $method !== 'POST') {
         doc_respond(['error' => 'method not allowed'], 405);
@@ -138,11 +140,26 @@ try {
     }
 
     if ($action === 'prune-cache') {
-        $api = new DockerApi();
-        $result = $api->pruneBuildCache();
-        $reclaimed = (int) ($result['SpaceReclaimed'] ?? 0);
-        Logger::log('build cache pruned, reclaimed=' . $reclaimed . ' bytes');
-        doc_respond(['ok' => true, 'reclaimed' => $reclaimed, 'humanReclaimed' => Orphans::humanBytes($reclaimed)]);
+        // A large prune runs for minutes and sends nothing until it finishes,
+        // so it cannot run synchronously inside an FPM/nginx request. Refuse a
+        // second prune while one is running, then hand off to a detached worker
+        // and return at once.
+        if (Pruner::running()) {
+            doc_respond(['error' => 'prune already running'], 409);
+        }
+        Pruner::writeStatus(['state' => 'starting', 'started' => time()]);
+        try {
+            Exec::spawnDetached(Exec::pruneArgv());
+        } catch (Throwable $e) {
+            Pruner::writeStatus(['state' => 'failed', 'message' => $e->getMessage(), 'finished' => time()]);
+            doc_respond(['error' => 'could not start prune: ' . $e->getMessage()], 500);
+        }
+        Logger::log('build cache prune started (detached worker)');
+        doc_respond(['started' => true]);
+    }
+
+    if ($action === 'prune-status') {
+        doc_respond(Pruner::status());
     }
 
     if ($action === 'delete') {
