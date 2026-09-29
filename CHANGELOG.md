@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026.09.29.02
+
+- Trim the packaged plugin `README.md` to the two-line Plugins-page blurb (bold
+  name + one sentence). The Unraid Plugins page renders the whole file inline,
+  so the full docs made the entry fill a screen. The full documentation now
+  lives in the repository README. CI guards the file (≤4 non-empty lines, no
+  `#`/`|` lines).
+
 ## 2026.09.29.01
 
 Polish from the first real-world run on unraid-syd (27 orphans; 21 untagged

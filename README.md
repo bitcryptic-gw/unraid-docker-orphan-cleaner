@@ -17,35 +17,38 @@ https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/mai
 ```
 
 Requires Unraid 7.0.0 or newer. The plugin appears as a tile under
-**Settings ▸ User Utilities** (reachable from the Tools area). Settings are on
-the same page.
+**Settings ▸ User Utilities**. Settings are on the same page.
 
 ## What it does
 
+A local image whose ID is not the `Image` of any container, running or stopped,
+is an orphan. Each orphan is classified in precedence order:
+
+| Class | Meaning | Ticked by default |
+|-------|---------|-------------------|
+| Pinned | Matches a user pin pattern. Never deleted, in the UI or by a scheduled run | no |
+| Template | `repo:tag` matches a `<Repository>` in `/boot/config/plugins/dockerMan/templates-user/*.xml`; the container was removed but the template remains | no |
+| Compose | `repo:tag` appears as an `image:` in a Docker Compose stack; a stack that is down makes its images look orphaned | no |
+| Tagged | Has a real tag, nothing references it | no |
+| Untagged | No tag (`<none>`), with or without a repo digest; superseded pulls are this class | yes |
+
 - Lists every orphan image (no container, running or stopped, references it).
-- Classifies each orphan, in precedence order:
-  1. **Pinned** - matches a user pin pattern. Never deleted, in the UI or by a
-     scheduled run.
-  2. **Template** - `repo:tag` matches a `<Repository>` in
-     `/boot/config/plugins/dockerMan/templates-user/*.xml`. The container was
-     removed but the template remains, so the user may reinstall it.
-  3. **Compose** - `repo:tag` appears as an `image:` in a Docker Compose stack.
-     A stack that is down makes its images look orphaned.
-  4. **Tagged** - has a real tag, nothing references it.
-  5. **Untagged** - no tag (`<none>`), whether or not it still carries a
-     repository digest. Superseded pulls (an image that lost its tag when the
-     tag moved to a newer pull) are this class. Ticked by default.
-- Shows image id, tags, created date, size and whether the image has children.
+- Shows image id, tags, created date, size, a unique size (`Size − SharedSize`)
+  and whether the image has children.
 - Deletes in bulk, one image per API call, never forced. A refused parent image
   is reported per image instead of failing the whole batch.
-- Shows the reclaimable build cache from `/system/df` and prunes it on request,
-  behind its own confirmation.
-- Optional scheduled run (daily or weekly), notify-only by default. A scheduled
-  delete can only ever remove untagged images and always respects pins and the
-  minimum age.
+- Shows the reclaimable build cache from `/system/df` and prunes it on request
+  (asynchronously), behind its own confirmation.
 
-See the shipped [`README.md`](src/usr/local/emhttp/plugins/docker.orphan.cleaner/README.md)
-for the end-user view.
+### Schedule
+
+Scheduled runs (daily or weekly) default to **notify only**. Even in delete mode
+they only ever touch untagged images, and they respect pins and the minimum age.
+Turn the schedule off, or use notify mode, if you want to review every deletion
+by hand.
+
+The packaged plugin `README.md` is intentionally just the one-line blurb shown
+on the Unraid Plugins page; this file is the full documentation.
 
 ## Architecture
 
@@ -170,6 +173,13 @@ the user can tell what the image was.
 Cron is written to
 `/boot/config/plugins/docker.orphan.cleaner/docker.orphan.cleaner.cron` and
 loaded with `update_cron`, Unraid's native mechanism, so it survives reboots.
+
+## Uninstall
+
+Removing the plugin deletes its files, its cron fragment and its config
+directory (`/boot/config/plugins/docker.orphan.cleaner/`). No other plugin,
+container or template is touched. The prune worker keeps its lock and status
+under `/tmp/docker.orphan.cleaner/`, which clears on reboot.
 
 ## Build
 

@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "docker.orphan.cleaner">
 <!ENTITY author      "bitcryptic-gw">
-<!ENTITY version     "2026.09.29.01">
+<!ENTITY version     "2026.09.29.02">
 <!ENTITY launch      "Settings/DockerOrphanCleaner">
 <!ENTITY github      "bitcryptic-gw/unraid-docker-orphan-cleaner">
 <!ENTITY pluginURL   "https://raw.githubusercontent.com/&github;/main/plugin/&name;.plg">
@@ -24,6 +24,12 @@
         readme="https://github.com/&github;#readme">
 
 <CHANGES>
+###2026.09.29.02
+- Trim the packaged plugin README to the two-line Plugins-page blurb (bold name
+  plus one sentence). The Unraid Plugins page renders the whole file inline, so
+  the full docs (headings, table, sections) made the entry fill a screen. The
+  full documentation now lives in the repository README.
+
 ###2026.09.29.01
 - Polish from the first real-world run on unraid-syd.
 - Results table now repeats the image label (tag, or repo@sha256:short for
@@ -74,7 +80,7 @@ for old in $(ls &pluginLOC;/&name;-*.txz 2>/dev/null | grep -v "&packagefile;");
 
 <FILE Name="&pluginLOC;/&packagefile;" Run="upgradepkg --install-new">
 <URL>&packageURL;</URL>
-<SHA256>34853d2709f49d5a09dd9e5848f5604b7e14263b657ee4c383b1d0b9e92c6d68</SHA256>
+<SHA256>7b3ed437e5c60f0463c1bb6856d8d54480b078fc316e68c3186614db9d86a0fe</SHA256>
 </FILE>
 
 <FILE Run="/bin/bash">

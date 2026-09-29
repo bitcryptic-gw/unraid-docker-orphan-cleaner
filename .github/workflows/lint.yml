@@ -65,6 +65,22 @@ jobs:
           fi
           echo "OK: no forbidden shell calls; proc_open appears only in include/Exec.php ($calls call(s))"
 
+      - name: Plugins-page README is a short blurb
+        run: |
+          set -e
+          f=src/usr/local/emhttp/plugins/docker.orphan.cleaner/README.md
+          nonempty="$(grep -cve '^[[:space:]]*$' "$f")"
+          echo "non-empty lines: $nonempty"
+          if [ "$nonempty" -gt 4 ]; then
+            echo "::error::$f must have at most 4 non-empty lines (has $nonempty)"
+            exit 1
+          fi
+          if grep -qE '^[[:space:]]*(#|\|)' "$f"; then
+            echo "::error::$f must not contain heading (#) or table (|) lines"
+            exit 1
+          fi
+          echo "OK: $f is a short blurb"
+
       - name: Shellcheck
         run: |
           set -e
