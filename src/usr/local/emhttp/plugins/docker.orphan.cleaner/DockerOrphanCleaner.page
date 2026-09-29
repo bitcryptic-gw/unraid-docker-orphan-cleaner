@@ -62,9 +62,9 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   <div class="dorphan-banner" id="dorphan-banner" hidden></div>
 
   <div class="dorphan-bar">
-    <label class="dorphan-check" title="When enabled nothing is deleted; the plugin reports what it would do.">
+    <label class="dorphan-check" title="When enabled nothing is deleted or pruned; the plugin reports what it would do.">
       <input type="checkbox" id="dorphan-dryrun" checked>
-      Dry run
+      Dry run (applies to Delete and Prune)
     </label>
     <span class="dorphan-spacer"></span>
     <button type="button" class="dorphan-btn" id="dorphan-refresh">Refresh</button>
@@ -502,10 +502,19 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   }
 
   function doPrune() {
+    if ($('dorphan-dryrun').checked) {
+      // Dry run also covers prune: estimate only, and the server refuses to
+      // spawn the worker when dryRun is set.
+      api('prune-cache', { dryRun: true }).then(function (data) {
+        banner('warn', 'Dry run: would reclaim ' + fmtBytes(data.reclaimable || 0)
+          + ' (' + (data.items || 0) + ' entries).');
+      }).catch(function (err) { banner('error', err.message); });
+      return;
+    }
     var p = document.createElement('p');
     p.textContent = 'This removes the reclaimable Docker build cache. Running containers and images are not affected. Continue?';
     openModal('Prune build cache', [p], 'Prune', function () {
-      api('prune-cache', {}).then(function () {
+      api('prune-cache', { dryRun: false }).then(function () {
         banner('warn', 'Build cache prune started\u2026');
         pruneButton(true);
         pollPruneStatus();

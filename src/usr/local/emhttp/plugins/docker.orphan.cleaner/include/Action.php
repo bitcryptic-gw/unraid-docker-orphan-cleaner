@@ -140,12 +140,26 @@ try {
     }
 
     if ($action === 'prune-cache') {
+        // Dry run: report the estimate and never start the worker. The figure
+        // is computed here from /system/df (same source as the header), so the
+        // client cannot talk the server into a real prune.
+        if (!empty($body['dryRun'])) {
+            $api = new DockerApi();
+            $df = $api->systemDf();
+            $cache = Orphans::buildCacheFromDf($df);
+            doc_respond([
+                'dryRun'         => true,
+                'reclaimable'    => $cache['reclaimable'],
+                'items'          => $cache['items'],
+                'humanReclaimed' => Orphans::humanBytes($cache['reclaimable']),
+            ]);
+        }
+
         // A large prune runs for minutes and sends nothing until it finishes,
         // so it cannot run synchronously inside an FPM/nginx request. Refuse a
         // second prune while one is running, then hand off to a detached worker
-        // and return at once.
-        // Claim the slot atomically before spawning, so a second click during
-        // the run is refused even before the worker has started.
+        // and return at once. Claim the slot atomically before spawning, so a
+        // second click during the run is refused even before the worker starts.
         if (!Pruner::claim()) {
             doc_respond(['error' => 'prune already running'], 409);
         }

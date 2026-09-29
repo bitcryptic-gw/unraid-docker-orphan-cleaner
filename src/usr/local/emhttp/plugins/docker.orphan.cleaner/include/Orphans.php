@@ -601,7 +601,7 @@ final class Orphans
      * @param array<string,mixed> $df /system/df payload
      * @return array{reclaimable:int,items:int}
      */
-    private static function buildCacheFromDf(array $df): array
+    public static function buildCacheFromDf(array $df): array
     {
         $result = ['reclaimable' => 0, 'items' => 0];
         if (!isset($df['BuildCache']) || !is_array($df['BuildCache'])) {

@@ -7,6 +7,10 @@
   so the full docs made the entry fill a screen. The full documentation now
   lives in the repository README. CI guards the file (≤4 non-empty lines, no
   `#`/`|` lines).
+- Dry run now also covers **Prune build cache**. While Dry run is ticked, the
+  prune button reports "would reclaim X (N entries)" and the server never
+  starts the worker; untick it for the real (confirmed, async) prune. The
+  toggle is labelled "Dry run (applies to Delete and Prune)".
 
 ## 2026.09.29.01
 

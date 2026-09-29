@@ -39,6 +39,9 @@ is an orphan. Each orphan is classified in precedence order:
   is reported per image instead of failing the whole batch.
 - Shows the reclaimable build cache from `/system/df` and prunes it on request
   (asynchronously), behind its own confirmation.
+- A **Dry run** toggle sits above the buttons and governs both **Delete and
+  Prune**: while it is ticked nothing is deleted or pruned, and the plugin
+  reports what it would do (the server enforces this too).
 
 ### Schedule
 

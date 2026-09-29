@@ -29,6 +29,10 @@
   plus one sentence). The Unraid Plugins page renders the whole file inline, so
   the full docs (headings, table, sections) made the entry fill a screen. The
   full documentation now lives in the repository README.
+- Dry run now also covers Prune build cache. While Dry run is ticked the prune
+  button reports "would reclaim X (N entries)" and no worker is started; the
+  server refuses to spawn a prune when dryRun is set. The toggle is labelled
+  "Dry run (applies to Delete and Prune)".
 
 ###2026.09.29.01
 - Polish from the first real-world run on unraid-syd.
@@ -80,7 +84,7 @@ for old in $(ls &pluginLOC;/&name;-*.txz 2>/dev/null | grep -v "&packagefile;");
 
 <FILE Name="&pluginLOC;/&packagefile;" Run="upgradepkg --install-new">
 <URL>&packageURL;</URL>
-<SHA256>7b3ed437e5c60f0463c1bb6856d8d54480b078fc316e68c3186614db9d86a0fe</SHA256>
+<SHA256>0709e80a8dcceeecd2fbdc062a5f1d569f20f527bfc925985016b4a4aa24c316</SHA256>
 </FILE>
 
 <FILE Run="/bin/bash">
