@@ -5,14 +5,20 @@ declare(strict_types=1);
  * Lock + status bookkeeping for the detached build-cache prune worker.
  *
  * State lives under /tmp (not flash) so a long prune does not write to the
- * boot device. The lock is an flock() so it is released automatically if the
- * worker dies; the status file is a tiny JSON document the UI polls.
+ * boot device. The lock is a marker file the web action claims atomically
+ * (exclusive create) before it spawns the worker, so a second click is refused
+ * immediately; the worker removes it when it finishes. A marker older than
+ * STALE_SECONDS is treated as abandoned (the worker's own timeout is shorter)
+ * so a crashed worker cannot block pruning forever.
  */
 final class Pruner
 {
     public const DIR = '/tmp/docker.orphan.cleaner';
     public const LOCK = self::DIR . '/prune.lock';
     public const STATUS = self::DIR . '/prune.status';
+
+    /** Longer than the worker's own 900 s prune timeout. */
+    public const STALE_SECONDS = 1800;
 
     public static function ensureDir(): void
     {
@@ -43,43 +49,39 @@ final class Pruner
         @file_put_contents(self::STATUS, json_encode($data), LOCK_EX);
     }
 
-    /**
-     * Try to take the exclusive prune lock without blocking.
-     *
-     * @return resource|false the lock handle, or false if a prune already holds it
-     */
-    public static function tryLock()
-    {
-        self::ensureDir();
-        $handle = @fopen(self::LOCK, 'c');
-        if ($handle === false) {
-            return false;
-        }
-        if (!@flock($handle, LOCK_EX | LOCK_NB)) {
-            fclose($handle);
-            return false;
-        }
-        return $handle;
-    }
-
-    /**
-     * @param resource|false $handle
-     */
-    public static function unlock($handle): void
-    {
-        if (is_resource($handle)) {
-            @flock($handle, LOCK_UN);
-            @fclose($handle);
-        }
-    }
-
     public static function running(): bool
     {
-        $handle = self::tryLock();
-        if ($handle === false) {
-            return true;
+        if (!is_file(self::LOCK)) {
+            return false;
         }
-        self::unlock($handle);
-        return false;
+        $mtime = @filemtime(self::LOCK);
+        if ($mtime !== false && (time() - $mtime) > self::STALE_SECONDS) {
+            @unlink(self::LOCK);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Atomically claim the running slot. Returns false if a prune is already
+     * running (or a live marker exists).
+     */
+    public static function claim(): bool
+    {
+        if (self::running()) {
+            return false;
+        }
+        self::ensureDir();
+        $handle = @fopen(self::LOCK, 'x');
+        if ($handle === false) {
+            return false;
+        }
+        fclose($handle);
+        return true;
+    }
+
+    public static function release(): void
+    {
+        @unlink(self::LOCK);
     }
 }

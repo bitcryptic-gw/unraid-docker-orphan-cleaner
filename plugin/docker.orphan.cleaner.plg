@@ -74,7 +74,7 @@ for old in $(ls &pluginLOC;/&name;-*.txz 2>/dev/null | grep -v "&packagefile;");
 
 <FILE Name="&pluginLOC;/&packagefile;" Run="upgradepkg --install-new">
 <URL>&packageURL;</URL>
-<SHA256>c18219a9a10a888db6197d9ff269bf4783accf87809c86eb146cd24a97e72df1</SHA256>
+<SHA256>34853d2709f49d5a09dd9e5848f5604b7e14263b657ee4c383b1d0b9e92c6d68</SHA256>
 </FILE>
 
 <FILE Run="/bin/bash">

@@ -144,13 +144,16 @@ try {
         // so it cannot run synchronously inside an FPM/nginx request. Refuse a
         // second prune while one is running, then hand off to a detached worker
         // and return at once.
-        if (Pruner::running()) {
+        // Claim the slot atomically before spawning, so a second click during
+        // the run is refused even before the worker has started.
+        if (!Pruner::claim()) {
             doc_respond(['error' => 'prune already running'], 409);
         }
         Pruner::writeStatus(['state' => 'starting', 'started' => time()]);
         try {
             Exec::spawnDetached(Exec::pruneArgv());
         } catch (Throwable $e) {
+            Pruner::release();
             Pruner::writeStatus(['state' => 'failed', 'message' => $e->getMessage(), 'finished' => time()]);
             doc_respond(['error' => 'could not start prune: ' . $e->getMessage()], 500);
         }

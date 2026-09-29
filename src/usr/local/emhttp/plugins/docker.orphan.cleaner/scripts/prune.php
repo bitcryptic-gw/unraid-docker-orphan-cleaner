@@ -24,9 +24,9 @@ require_once '/usr/local/emhttp/plugins/docker.orphan.cleaner/include/Logger.php
 set_time_limit(0);
 ignore_user_abort(true);
 
-$lock = Pruner::tryLock();
-if ($lock === false) {
-    // Another prune is already running; nothing to do.
+// The web action claims the lock before spawning; a manual run claims it here.
+Pruner::ensureDir();
+if (!is_file(Pruner::LOCK) && !Pruner::claim()) {
     Logger::log('prune worker skipped, another prune is running');
     exit(0);
 }
@@ -55,7 +55,7 @@ try {
     ]);
     Logger::log('prune worker failed: ' . $e->getMessage());
 } finally {
-    Pruner::unlock($lock);
+    Pruner::release();
 }
 
 exit(0);
