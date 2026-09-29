@@ -15,6 +15,7 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
 .dorphan-banner { margin:12px 0; padding:10px 12px; border-radius:6px; border:1px solid var(--border-color,#3a3a3a); background:var(--background-color,#1b1b1b); }
 .dorphan-banner.error { border-color:#c0392b; color:#e74c3c; }
 .dorphan-banner.warn { border-color:#d68910; color:#e67e22; }
+.dorphan-banner.info { border-color:#3498db; color:#3498db; }
 .dorphan-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }
 .dorphan-bar .dorphan-spacer { flex:1 1 auto; }
 .dorphan-check { display:inline-flex; align-items:center; gap:6px; }
@@ -162,8 +163,11 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   var ENDPOINT = '/plugins/docker.orphan.cleaner/include/Action.php';
   var CSRF = <?php echo json_encode($docCsrf, JSON_HEX_TAG | JSON_HEX_AMP); ?>;
 
-  var state = { rows: [], selected: new Set(), buildCache: 0, dockerOk: false };
+  var state = { rows: [], selected: new Set(), buildCache: 0, dockerOk: false, pruneRunning: false };
   var $ = function (id) { return document.getElementById(id); };
+
+  var ACTION_BUTTONS = ['dorphan-refresh', 'dorphan-delete', 'dorphan-prune', 'dorphan-save'];
+  var DESTRUCTIVE_BUTTONS = ['dorphan-delete', 'dorphan-prune'];
 
   function esc(text) { return text == null ? '' : String(text); }
 
@@ -203,6 +207,30 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   }
 
   function setStatus(text) { $('dorphan-status').textContent = text; }
+
+  // While an action is in flight, disable the button that started it plus the
+  // other destructive buttons, so a slow request cannot be double-submitted.
+  // When nothing is active only a genuinely running prune keeps its button off.
+  function syncActionButtons(activeId) {
+    ACTION_BUTTONS.forEach(function (id) {
+      var btn = $(id);
+      if (!btn) { return; }
+      if (activeId) {
+        btn.disabled = (id === activeId) || DESTRUCTIVE_BUTTONS.indexOf(id) !== -1;
+      } else {
+        btn.disabled = (id === 'dorphan-prune') ? state.pruneRunning : false;
+      }
+    });
+  }
+
+  function beginAction(buttonId, message, kind) {
+    banner(kind || 'info', message);
+    syncActionButtons(buttonId);
+  }
+
+  function endAction() {
+    syncActionButtons(null);
+  }
 
   function badge(cls, label) {
     var span = document.createElement('span');
@@ -330,10 +358,12 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
     return v.toFixed(v < 10 ? 2 : 1) + ' ' + u;
   }
 
-  function load() {
+  function load(options) {
+    options = options || {};
+    var buttonId = options.button || null;
+    if (buttonId) { beginAction(buttonId, options.message || 'Refreshing\u2026'); }
     setStatus('Loading\u2026');
-    banner(null);
-    api('list', null, 'GET').then(function (data) {
+    return api('list', null, 'GET').then(function (data) {
       state.rows = data.orphans || [];
       state.buildCache = (data.buildCache && data.buildCache.reclaimable) || 0;
       state.dockerOk = !!data.dockerOk;
@@ -353,11 +383,13 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
       if (c.pinned) { parts.push(c.pinned + ' pinned'); }
       setStatus(total + ' orphan' + (total === 1 ? '' : 's') + ': ' + parts.join(', '));
       $('dorphan-results-wrap').hidden = true;
+      if (buttonId) { endAction(); banner(null); }
     }).catch(function (err) {
       setStatus('Error');
       banner('error', 'Could not read Docker: ' + err.message + ' (is the Docker service running?)');
       state.rows = [];
       renderRows();
+      if (buttonId) { endAction(); }
     });
   }
 
@@ -409,10 +441,24 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
       ul.appendChild(li);
     });
     openModal(dry ? 'Dry run' : 'Confirm deletion', [p, ul], dry ? 'Run dry run' : 'Delete ' + rows.length + ' image(s)', function () {
-      api('delete', { ids: rows.map(function (r) { return r.id; }), dryRun: dry }).then(function (data) {
-        showResults(data.results || []);
-        if (!dry) { load(); } else { banner(null); }
+      var ids = rows.map(function (r) { return r.id; });
+      beginAction('dorphan-delete', dry
+        ? 'Deleting ' + rows.length + ' image(s) (dry run)\u2026'
+        : 'Deleting ' + rows.length + ' image(s)\u2026');
+      api('delete', { ids: ids, dryRun: dry }).then(function (data) {
+        var results = data.results || [];
+        showResults(results);
+        endAction();
+        if (dry) {
+          var would = results.filter(function (r) { return r.status === 'would-delete'; }).length;
+          banner('warn', 'Dry run: ' + would + ' of ' + rows.length + ' image(s) would be deleted.');
+        } else {
+          var deleted = results.filter(function (r) { return r.status === 'deleted'; }).length;
+          banner('info', 'Deleted ' + deleted + ' of ' + rows.length + ' image(s).');
+          load();
+        }
       }).catch(function (err) {
+        endAction();
         banner('error', err.message);
       });
     });
@@ -458,10 +504,10 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   var pruneTimer = null;
 
   function pruneButton(running) {
+    state.pruneRunning = !!running;
     var btn = $('dorphan-prune');
-    if (!btn) { return; }
-    btn.disabled = !!running;
-    btn.textContent = running ? 'Pruning\u2026' : 'Prune build cache';
+    if (btn) { btn.textContent = state.pruneRunning ? 'Pruning\u2026' : 'Prune build cache'; }
+    syncActionButtons(null);
   }
 
   function pollPruneStatus() {
@@ -504,26 +550,33 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   function doPrune() {
     if ($('dorphan-dryrun').checked) {
       // Dry run also covers prune: estimate only, and the server refuses to
-      // spawn the worker when dryRun is set.
+      // spawn the worker unless dryRun is explicitly false.
+      beginAction('dorphan-prune', 'Estimating\u2026');
       api('prune-cache', { dryRun: true }).then(function (data) {
+        endAction();
         banner('warn', 'Dry run: would reclaim ' + fmtBytes(data.reclaimable || 0)
           + ' (' + (data.items || 0) + ' entries).');
-      }).catch(function (err) { banner('error', err.message); });
+      }).catch(function (err) {
+        endAction();
+        banner('error', err.message);
+      });
       return;
     }
     var p = document.createElement('p');
     p.textContent = 'This removes the reclaimable Docker build cache. Running containers and images are not affected. Continue?';
     openModal('Prune build cache', [p], 'Prune', function () {
+      beginAction('dorphan-prune', 'Starting prune\u2026');
       api('prune-cache', { dryRun: false }).then(function () {
-        banner('warn', 'Build cache prune started\u2026');
         pruneButton(true);
+        banner('warn', 'Build cache prune started\u2026');
         pollPruneStatus();
       }).catch(function (err) {
         if (err.status === 409) {
-          banner('warn', 'A prune is already running.');
           pruneButton(true);
+          banner('warn', 'A prune is already running.');
           pollPruneStatus();
         } else {
+          endAction();
           banner('error', err.message);
         }
       });
@@ -539,16 +592,21 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
       includeBuildCache: $('dorphan-buildcache').checked,
       pinPatterns: pins
     };
+    beginAction('dorphan-save', 'Saving\u2026');
     api('save-settings', payload).then(function (data) {
       applySettings(data.settings || {});
-      banner(null);
+      endAction();
+      banner('info', 'Settings saved.');
       setStatus('Settings saved.');
     }).catch(function (err) {
+      endAction();
       banner('error', 'Could not save settings: ' + err.message + (err.data && err.data.details ? ' (' + err.data.details.join('; ') + ')' : ''));
     });
   }
 
-  $('dorphan-refresh').addEventListener('click', load);
+  $('dorphan-refresh').addEventListener('click', function () {
+    load({ button: 'dorphan-refresh', message: 'Refreshing\u2026' });
+  });
   $('dorphan-select-untagged').addEventListener('click', function () {
     state.rows.forEach(function (r) { if (r.class === 'untagged') { state.selected.add(r.id); } });
     renderRows();

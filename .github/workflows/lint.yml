@@ -36,6 +36,11 @@ jobs:
           set -e
           php tests/classifier_test.php
 
+      - name: Request fail-safe unit test
+        run: |
+          set -e
+          php tests/request_test.php
+
       - name: Lint the .page PHP body
         run: |
           set -e

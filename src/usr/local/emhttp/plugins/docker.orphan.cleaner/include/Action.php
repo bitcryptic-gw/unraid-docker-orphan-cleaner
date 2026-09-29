@@ -24,6 +24,7 @@ require_once __DIR__ . '/Orphans.php';
 require_once __DIR__ . '/Logger.php';
 require_once __DIR__ . '/Exec.php';
 require_once __DIR__ . '/Pruner.php';
+require_once __DIR__ . '/Request.php';
 
 const DOC_MAX_BODY_BYTES = 65536;
 const DOC_MAX_IDS        = 200;
@@ -142,8 +143,9 @@ try {
     if ($action === 'prune-cache') {
         // Dry run: report the estimate and never start the worker. The figure
         // is computed here from /system/df (same source as the header), so the
-        // client cannot talk the server into a real prune.
-        if (!empty($body['dryRun'])) {
+        // client cannot talk the server into a real prune. Fail safe: only an
+        // explicit boolean dryRun=false starts a real prune.
+        if (!Request::isRealAction($body)) {
             $api = new DockerApi();
             $df = $api->systemDf();
             $cache = Orphans::buildCacheFromDf($df);
@@ -194,7 +196,8 @@ try {
             }
         }
 
-        $dryRun = !empty($body['dryRun']);
+        // Fail safe: only an explicit boolean dryRun=false performs deletions.
+        $dryRun = Request::isDryRun($body);
         $cfg = Config::load();
         $api = new DockerApi();
         $report = (new Orphans($api, $cfg))->compute();
