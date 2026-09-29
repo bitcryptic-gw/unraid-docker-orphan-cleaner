@@ -73,7 +73,7 @@ progress). Until it is, install it manually:
 It appears as a tile under **Settings ▸ User Utilities**. Settings (pins,
 minimum age, schedule) are on the same page.
 
-**Requires Unraid 7.0.0 or newer.**
+**Requires Unraid 7.0.0 or newer**
 **(tested on 7.3.2)**
 
 ## Source and issues
