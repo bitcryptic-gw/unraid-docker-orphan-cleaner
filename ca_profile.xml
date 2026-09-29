@@ -6,7 +6,7 @@
 -->
 <CommunityApplications>
   <Profile>
-Docker Orphan Cleaner is an Unraid plugin that lists Docker images no container references and removes the selected ones in bulk. Unraid itself only removes orphan images one at a time. Images are classified by how safe they are to remove (pinned, template referenced, compose referenced, tagged, untagged), only untagged images are selected by default, dry run is enforced on the server, and a scheduled run only ever deletes untagged images past a minimum age. Maintained by bitcryptic-gw.
+Docker Orphan Cleaner is an Unraid plugin that lists Docker images no container references and removes the selected ones in bulk. Unraid itself only removes orphan images one at a time. Images are classified by how safe they are to remove (pinned, template referenced, compose referenced, tagged, untagged), only untagged images are selected by default, dry run is enforced on the server, and a scheduled run only ever deletes untagged images past a minimum age. Maintained by BitCryptic.
   </Profile>
   <Icon>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/src/usr/local/emhttp/plugins/docker.orphan.cleaner/images/icon.png</Icon>
   <WebPage>https://github.com/bitcryptic-gw/unraid-docker-orphan-cleaner</WebPage>
