@@ -3,8 +3,6 @@
   Community Apps repository profile for this repository. Required (non-empty
   <Profile>) before a submission can be finalized; see
   https://ca.unraid.net/submit/help/repository-info-xml.
-
-  @@SUPPORT_URL@@ is the forum support thread, filled in in Stage B.
 -->
 <CommunityApplications>
   <Profile>
@@ -12,5 +10,5 @@ Docker Orphan Cleaner is an Unraid plugin that lists Docker images no container 
   </Profile>
   <Icon>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/src/usr/local/emhttp/plugins/docker.orphan.cleaner/images/icon.png</Icon>
   <WebPage>https://github.com/bitcryptic-gw/unraid-docker-orphan-cleaner</WebPage>
-  <Forum>@@SUPPORT_URL@@</Forum>
+  <Forum>https://forums.unraid.net/topic/200737-docker-orphan-cleaner/</Forum>
 </CommunityApplications>

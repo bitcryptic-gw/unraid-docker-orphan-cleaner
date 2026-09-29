@@ -10,14 +10,10 @@
 
   The <PluginURL> here must match the pluginURL attribute in the .plg exactly.
 
-  Placeholders that only resolve once Gary has acted:
-    @@SUPPORT_URL@@            forum support-thread URL (Stage B)
-    @@SCREENSHOT_MAIN@@        screenshot URLs (Gary captures; optional)
-    @@SCREENSHOT_CONFIRM@@
-    @@SCREENSHOT_RESULTS@@
-
-  This file is not published. For a separate-repo submission it is copied to
-  plugins/docker.orphan.cleaner.xml (starter layout) in Stage B.
+  Screenshots are optional and are omitted for now; Gary can add <Screenshot>
+  entries later once they are captured and hosted. For a separate-repo
+  submission this file is copied to plugins/docker.orphan.cleaner.xml (starter
+  layout).
 -->
 <Plugin>
   <Name>Docker Orphan Cleaner</Name>
@@ -33,7 +29,7 @@
   </Overview>
   <PluginURL>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/plugin/docker.orphan.cleaner.plg</PluginURL>
   <PluginAuthor>bitcryptic-gw</PluginAuthor>
-  <Support>@@SUPPORT_URL@@</Support>
+  <Support>https://forums.unraid.net/topic/200737-docker-orphan-cleaner/</Support>
   <Project>https://github.com/bitcryptic-gw/unraid-docker-orphan-cleaner</Project>
   <ReadMe>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/README.md</ReadMe>
   <Category>Tools:System</Category>
@@ -41,7 +37,4 @@
   <License>MIT</License>
   <MinVer>7.0.0</MinVer>
   <Beta>false</Beta>
-  <Screenshot>@@SCREENSHOT_MAIN@@</Screenshot>
-  <Screenshot>@@SCREENSHOT_CONFIRM@@</Screenshot>
-  <Screenshot>@@SCREENSHOT_RESULTS@@</Screenshot>
 </Plugin>

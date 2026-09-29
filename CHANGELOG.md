@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026.09.29.03
+
+- **Fail-safe dry run.** Delete and Prune build cache now act for real only when
+  the request carries an explicit boolean `dryRun=false`. A missing, null or
+  non-boolean value (including the string `"false"` and `0`) is treated as a dry
+  run, so an absent or malformed flag can never delete or prune. Enforced on the
+  server (`include/Request.php`) and covered by `tests/request_test.php`.
+- **Immediate feedback on every action button.** On click the button and the
+  destructive buttons are disabled and a banner appears at once (Refreshing,
+  Deleting N images, Estimating, Starting prune, Saving); it is replaced by the
+  result, or by the error with the buttons re-enabled. This also prevents a
+  double-submitted delete.
+- Support thread: https://forums.unraid.net/topic/200737-docker-orphan-cleaner/
+
 ## 2026.09.29.02
 
 - Trim the packaged plugin `README.md` to the two-line Plugins-page blurb (bold

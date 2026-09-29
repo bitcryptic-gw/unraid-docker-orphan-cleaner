@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "docker.orphan.cleaner">
 <!ENTITY author      "bitcryptic-gw">
-<!ENTITY version     "2026.09.29.02">
+<!ENTITY version     "2026.09.29.03">
 <!ENTITY launch      "Settings/DockerOrphanCleaner">
 <!ENTITY github      "bitcryptic-gw/unraid-docker-orphan-cleaner">
 <!ENTITY pluginURL   "https://raw.githubusercontent.com/&github;/main/plugin/&name;.plg">
@@ -19,11 +19,22 @@
         launch="&launch;"
         icon="icon.png"
         min="7.0.0"
-        support="https://github.com/&github;/issues"
+        support="https://forums.unraid.net/topic/200737-docker-orphan-cleaner/"
         project="https://github.com/&github;"
         readme="https://github.com/&github;#readme">
 
 <CHANGES>
+###2026.09.29.03
+- Fail-safe dry run: Delete and Prune build cache act only when the request
+  carries an explicit boolean dryRun=false. A missing, null or non-boolean
+  value (including the string "false" and 0) is treated as a dry run, so an
+  absent or malformed flag can never delete or prune.
+- Immediate feedback on every action button. On click the button and the
+  destructive buttons are disabled and a banner appears at once (Refreshing,
+  Deleting N images, Estimating, Starting prune, Saving); it is replaced by the
+  result, or by the error with the buttons re-enabled. Prevents double-submits.
+- Support thread: https://forums.unraid.net/topic/200737-docker-orphan-cleaner/
+
 ###2026.09.29.02
 - Trim the packaged plugin README to the two-line Plugins-page blurb (bold name
   plus one sentence). The Unraid Plugins page renders the whole file inline, so
@@ -84,7 +95,7 @@ for old in $(ls &pluginLOC;/&name;-*.txz 2>/dev/null | grep -v "&packagefile;");
 
 <FILE Name="&pluginLOC;/&packagefile;" Run="upgradepkg --install-new">
 <URL>&packageURL;</URL>
-<SHA256>0709e80a8dcceeecd2fbdc062a5f1d569f20f527bfc925985016b4a4aa24c316</SHA256>
+<SHA256>512269ad6b68da03a59856d4c9f675ec2bc11b2f11ee7b0ab2c450b621a49e7e</SHA256>
 </FILE>
 
 <FILE Run="/bin/bash">
