@@ -133,6 +133,24 @@ foreach ($pinned['orphans'] as $orphan) {
 check(($pinnedById[$multiDigest]['class'] ?? '') === 'pinned',
     'untagged image matching a pin is classified pinned');
 
+// SharedSize handling: present => unique = Size - SharedSize; -1 (or absent)
+// => unique stays unknown so the UI falls back to Size.
+$sharedSizes = [$untaggedWithDigest => 40, $multiDigest => -1];
+$sized = Orphans::buildReport($images, $referenced, [], [], [], [], $now, $sharedSizes);
+$sizedById = [];
+foreach ($sized['orphans'] as $orphan) {
+    $sizedById[$orphan['id']] = $orphan;
+}
+check(($sizedById[$untaggedWithDigest]['sharedSize'] ?? null) === 40
+    && ($sizedById[$untaggedWithDigest]['uniqueSize'] ?? null) === 71,
+    'uniqueSize = Size - SharedSize when SharedSize is present (111 - 40 = 71)');
+check(array_key_exists('uniqueSize', $sizedById[$multiDigest]) && $sizedById[$multiDigest]['uniqueSize'] === null,
+    'uniqueSize stays unknown when SharedSize is -1');
+check(array_key_exists('uniqueSize', $sizedById[$tagged]) && $sizedById[$tagged]['uniqueSize'] === null,
+    'uniqueSize stays unknown when SharedSize is missing');
+check(($sized['totals']['uniqueSize'] ?? null) === 71,
+    'unique total sums only rows with a known unique size');
+
 if ($failures > 0) {
     fwrite(STDERR, "\n{$failures} check(s) failed\n");
     exit(1);

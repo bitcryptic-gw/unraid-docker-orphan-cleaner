@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026.09.29.01
+
+Polish from the first real-world run on unraid-syd (27 orphans; 21 untagged
+deleted, 7.34 GB freed).
+
+- Results table now repeats the image label (tag, or `repo@sha256:short` for
+  untagged images) and size on every row; the Detail column keeps the Docker
+  message for refused / conflict / not-found rows.
+- New per-orphan **Unique** figure (`Size − SharedSize`, from `/system/df`) and
+  header totals of the form `Selected: N · X total, ≥ Y unique`, so the
+  reclaimable figure is not overstated by layers shared with other images.
+  `SharedSize` of `-1`/missing falls back to showing only Size.
+- Plugins-page `README.md` reformatted to the Unraid convention (bold name line
+  + one sentence), matching Community Applications / Fix Common Problems.
+- Same-day builds use a zero-padded dot counter (`2026.09.29.01`, `.02`, …).
+  Zero-padding is deliberate: Unraid's plugin manager compares versions with
+  `strcmp`, so `.10` must sort after `.09`.
+- Classifier test extended to cover `SharedSize` present and `-1`/missing.
+
 ## 2026.09.29
 
 - Fix: superseded image pulls were not listed. An image that lost its tag when

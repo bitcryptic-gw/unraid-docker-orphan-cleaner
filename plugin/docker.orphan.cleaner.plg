@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "docker.orphan.cleaner">
 <!ENTITY author      "bitcryptic-gw">
-<!ENTITY version     "2026.09.29">
+<!ENTITY version     "2026.09.29.01">
 <!ENTITY launch      "Settings/DockerOrphanCleaner">
 <!ENTITY github      "bitcryptic-gw/unraid-docker-orphan-cleaner">
 <!ENTITY pluginURL   "https://raw.githubusercontent.com/&github;/main/plugin/&name;.plg">
@@ -24,6 +24,18 @@
         readme="https://github.com/&github;#readme">
 
 <CHANGES>
+###2026.09.29.01
+- Polish from the first real-world run on unraid-syd.
+- Results table now repeats the image label (tag, or repo@sha256:short for
+  untagged) and size on every row.
+- New "Unique" figure per orphan (Size minus SharedSize from /system/df) and
+  the header totals now show "N - X total, >= Y unique" so the reclaimable
+  figure is not overstated by shared layers.
+- Plugins page entry reformatted to the Unraid convention (bold name line plus
+  one sentence).
+- Same-day builds now use a dot counter (2026.09.29.01, .02, ...). Note: Unraid
+  compares plugin versions with strcmp, so the counter is zero-padded.
+
 ###2026.09.29
 - Fix: superseded image pulls were not listed. An image that lost its tag when
   a tag moved to a newer pull (empty RepoTags, still carrying RepoDigests) is
@@ -57,7 +69,7 @@ for old in $(ls &pluginLOC;/&name;-*.txz 2>/dev/null | grep -v "&packagefile;");
 
 <FILE Name="&pluginLOC;/&packagefile;" Run="upgradepkg --install-new">
 <URL>&packageURL;</URL>
-<SHA256>7c45ebb6b51a58dcf2580401e01da3a648a78b10402a39fffc5477e329381907</SHA256>
+<SHA256>b827999149010525d533138e0a17cb01df87a07b0f37ad6f5a583412ca05a9ed</SHA256>
 </FILE>
 
 <FILE Run="/bin/bash">

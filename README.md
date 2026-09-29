@@ -170,6 +170,12 @@ Produces `build/dist/docker.orphan.cleaner-<version>-noarch-1.txz` and stamps
 its SHA256 into `plugin/docker.orphan.cleaner.plg`. Packaging is deterministic,
 so rebuilding anywhere yields the same file; CI relies on this.
 
+`VERSION` is `YYYY.MM.DD`, with a **zero-padded** same-day counter when needed
+(`YYYY.MM.DD.NN`). Zero-padding is deliberate: Unraid's plugin manager compares
+plugin versions with `strcmp` (not `version_compare`), so `.10` must sort after
+`.09`. The version contains no hyphen, so the identical string is used in the
+git tag, the `.plg` and the package filename.
+
 ## Testing
 
 `lint.yml` runs `php -l` over all PHP (including the `.page` body),

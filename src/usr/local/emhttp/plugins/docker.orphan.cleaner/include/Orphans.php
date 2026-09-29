@@ -31,6 +31,10 @@ final class Orphan
     public $ageDays = 0;
     /** @var int bytes */
     public $size = 0;
+    /** @var int|null bytes shared with other images (from /system/df); null if unknown */
+    public $sharedSize = null;
+    /** @var int|null size minus shared layers; null if SharedSize is unavailable */
+    public $uniqueSize = null;
     /** @var array<int,string> */
     public $reasons = [];
 
@@ -52,7 +56,10 @@ final class Orphan
             'created'     => $this->created,
             'ageDays'     => $this->ageDays,
             'size'        => $this->size,
+            'sharedSize'  => $this->sharedSize,
+            'uniqueSize'  => $this->uniqueSize,
             'humanSize'   => Orphans::humanBytes($this->size),
+            'humanUniqueSize' => $this->uniqueSize === null ? null : Orphans::humanBytes($this->uniqueSize),
             'reasons'     => array_values($this->reasons),
         ];
     }
@@ -174,15 +181,34 @@ final class Orphans
             }
         }
 
+        // SharedSize is only populated by /system/df, not by /images/json. It
+        // lets us report how much of an image's Size is not shared with others.
+        $df = [];
+        try {
+            $df = $this->api->systemDf();
+        } catch (DockerApiException $e) {
+            $df = [];
+        }
+        $sharedSizes = [];
+        if (isset($df['Images']) && is_array($df['Images'])) {
+            foreach ($df['Images'] as $entry) {
+                if (is_array($entry) && isset($entry['Id']) && array_key_exists('SharedSize', $entry)) {
+                    $sharedSizes[(string) $entry['Id']] = (int) $entry['SharedSize'];
+                }
+            }
+        }
+
         $report = self::buildReport(
             $candidates,
             $referenced,
             $this->computeChildren($all),
             $this->templateRepositories(),
             $this->composeImages(),
-            $this->cfg->pinPatterns
+            $this->cfg->pinPatterns,
+            null,
+            $sharedSizes
         );
-        $report['buildCache'] = $this->buildCacheInfo();
+        $report['buildCache'] = self::buildCacheFromDf($df);
         return $report;
     }
 
@@ -196,6 +222,7 @@ final class Orphans
      * @param array<string,string>           $templateRepos normalized repo:tag => file
      * @param array<string,string>           $composeImages normalized repo:tag => file
      * @param array<int,string>              $pins
+     * @param array<string,int>              $sharedSizes    image id => SharedSize bytes
      * @return array<string,mixed>
      */
     public static function buildReport(
@@ -205,7 +232,8 @@ final class Orphans
         array $templateRepos,
         array $composeImages,
         array $pins,
-        ?int $now = null
+        ?int $now = null,
+        array $sharedSizes = []
     ): array {
         $now = $now ?? time();
         $orphans = [];
@@ -213,6 +241,7 @@ final class Orphans
         $totals = [
             'count'         => 0,
             'size'          => 0,
+            'uniqueSize'    => 0,
             'preselect'     => 0,
             'preselectSize' => 0,
             'classes'       => [
@@ -241,6 +270,12 @@ final class Orphans
             $orphan->digests = $digests;
             $orphan->created = (int) ($image['Created'] ?? 0);
             $orphan->size = (int) ($image['Size'] ?? 0);
+            if (array_key_exists($id, $sharedSizes)) {
+                $orphan->sharedSize = (int) $sharedSizes[$id];
+                if ($orphan->sharedSize >= 0) {
+                    $orphan->uniqueSize = max(0, $orphan->size - $orphan->sharedSize);
+                }
+            }
             $orphan->hasChildren = isset($children[$id]);
             $orphan->ageDays = $orphan->created > 0 ? (int) floor(max(0, $now - $orphan->created) / 86400) : 0;
             if (count($tags) === 0 && count($digests) > 0) {
@@ -252,6 +287,9 @@ final class Orphans
             $orphans[] = $orphan;
             $totals['count']++;
             $totals['size'] += $orphan->size;
+            if ($orphan->uniqueSize !== null) {
+                $totals['uniqueSize'] += $orphan->uniqueSize;
+            }
             $totals['classes'][$orphan->class]++;
             if ($orphan->preselect) {
                 $totals['preselect']++;
@@ -560,16 +598,12 @@ final class Orphans
     }
 
     /**
+     * @param array<string,mixed> $df /system/df payload
      * @return array{reclaimable:int,items:int}
      */
-    private function buildCacheInfo(): array
+    private static function buildCacheFromDf(array $df): array
     {
         $result = ['reclaimable' => 0, 'items' => 0];
-        try {
-            $df = $this->api->systemDf();
-        } catch (DockerApiException $e) {
-            return $result;
-        }
         if (!isset($df['BuildCache']) || !is_array($df['BuildCache'])) {
             return $result;
         }

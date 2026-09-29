@@ -85,6 +85,7 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
         <th>Tags</th>
         <th>Created</th>
         <th>Size</th>
+        <th>Unique</th>
         <th>Children</th>
       </tr>
     </thead>
@@ -94,7 +95,7 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   <div id="dorphan-results-wrap" hidden style="margin-top:22px">
     <h3>Results</h3>
     <table class="tablesorter">
-      <thead><tr><th>Image</th><th>Status</th><th>Detail</th></tr></thead>
+      <thead><tr><th>Image</th><th>Label</th><th>Size</th><th>Status</th><th>Detail</th></tr></thead>
       <tbody id="dorphan-results"></tbody>
     </table>
   </div>
@@ -260,6 +261,16 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
       tdSize.textContent = row.humanSize;
       tr.appendChild(tdSize);
 
+      var tdUnique = document.createElement('td');
+      if (row.uniqueSize != null) {
+        tdUnique.textContent = row.humanUniqueSize || fmtBytes(row.uniqueSize);
+        tdUnique.title = 'Size minus layers shared with other images. Lower bound: layers shared only among the selected images are also freed.';
+      } else {
+        tdUnique.textContent = 'unknown';
+        tdUnique.classList.add('dorphan-none');
+      }
+      tr.appendChild(tdUnique);
+
       var tdChildren = document.createElement('td');
       if (row.hasChildren) { tdChildren.textContent = 'yes (cannot be removed)'; }
       else { tdChildren.textContent = 'no'; }
@@ -270,7 +281,7 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
     if (state.rows.length === 0) {
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.colSpan = 7;
+      td.colSpan = 8;
       td.className = 'dorphan-none';
       td.textContent = 'No orphan images found.';
       tr.appendChild(td);
@@ -280,27 +291,32 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
   }
 
   function renderTotals() {
-    var selectedSize = 0;
+    var selectedTotal = 0;
+    var selectedUnique = 0;
+    var uniqueKnown = 0;
     state.selected.forEach(function (id) {
       var row = state.rows.find(function (r) { return r.id === id; });
-      if (row) { selectedSize += row.size; }
+      if (!row) { return; }
+      selectedTotal += row.size;
+      if (row.uniqueSize != null) { selectedUnique += row.uniqueSize; uniqueKnown++; }
     });
-    var totalSize = state.rows.reduce(function (sum, r) { return sum + r.size; }, 0);
     var el = $('dorphan-totals');
     el.textContent = '';
-    function add(label, value, strong) {
+    function add(label, value, title) {
       var wrap = document.createElement('span');
       var b = document.createElement('b');
       b.textContent = label + ': ';
       wrap.appendChild(b);
       wrap.appendChild(document.createTextNode(value));
-      if (strong) { wrap.style.fontWeight = '600'; }
+      if (title) { wrap.title = title; }
       el.appendChild(wrap);
     }
-    add('Orphans', state.rows.length);
-    add('Reclaimable', fmtBytes(totalSize));
-    add('Selected', state.selected.size);
-    add('Selected size', fmtBytes(selectedSize));
+    add('Orphans', String(state.rows.length));
+    var selected = state.selected.size + ' \u00b7 ' + fmtBytes(selectedTotal) + ' total';
+    if (uniqueKnown > 0) { selected += ', \u2265 ' + fmtBytes(selectedUnique) + ' unique'; }
+    add('Selected', selected,
+      'Total is the sum of each image Size, which counts shared layers and so overstates the saving. ' +
+      'Unique subtracts layers shared with other images; it is a lower bound, because layers shared only among the selected images are also freed.');
     add('Build cache', state.buildCache ? fmtBytes(state.buildCache) + ' reclaimable' : 'none');
   }
 
@@ -402,6 +418,12 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
     });
   }
 
+  function resultLabel(r) {
+    if (r.tags && r.tags.length) { return r.tags.join(', '); }
+    if (r.digestLabel) { return r.digestLabel; }
+    return '<untagged>';
+  }
+
   function showResults(results) {
     var wrap = $('dorphan-results-wrap');
     var tbody = $('dorphan-results');
@@ -411,13 +433,21 @@ $docCsrf = is_array($docVar) && isset($docVar['csrf_token']) ? (string) $docVar[
       var tdId = document.createElement('td');
       tdId.className = 'dorphan-tags';
       tdId.textContent = r.id ? r.id.slice(0, 19) : '';
+      tdId.title = r.id || '';
       tr.appendChild(tdId);
+      var tdLabel = document.createElement('td');
+      tdLabel.className = 'dorphan-tags';
+      tdLabel.textContent = r.id ? resultLabel(r) : '';
+      tr.appendChild(tdLabel);
+      var tdSize = document.createElement('td');
+      tdSize.textContent = r.humanSize || '';
+      tr.appendChild(tdSize);
       var tdStatus = document.createElement('td');
       tdStatus.className = 'dorphan-status-' + r.status;
       tdStatus.textContent = r.status;
       tr.appendChild(tdStatus);
       var tdDetail = document.createElement('td');
-      tdDetail.textContent = [].concat(r.tags || []).join(', ') + (r.message ? ' - ' + r.message : '');
+      tdDetail.textContent = r.message || '';
       tr.appendChild(tdDetail);
       tbody.appendChild(tr);
     });

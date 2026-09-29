@@ -76,11 +76,18 @@ jobs:
           xmllint --noout plugin/docker.orphan.cleaner.plg
           xmllint --noout ca/docker.orphan.cleaner.xml
 
+      - name: VERSION format
+        run: |
+          set -e
+          v="$(tr -d '[:space:]' < VERSION)"
+          echo "$v" | grep -qE '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$'
+          echo "VERSION=$v ok"
+
       - name: Version matches between VERSION and the .plg
         run: |
           set -e
           file_version="$(tr -d '[:space:]' < VERSION)"
-          plg_version="$(grep -oE '<!ENTITY version +"[^"]+"' plugin/docker.orphan.cleaner.plg | grep -oE '[0-9]{4}\.[0-9]{2}\.[0-9]{2}[a-z]?')"
+          plg_version="$(grep -oE '<!ENTITY version +"[^"]+"' plugin/docker.orphan.cleaner.plg | grep -oE '[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?')"
           echo "VERSION=$file_version plg=$plg_version"
           test "$file_version" = "$plg_version"
 

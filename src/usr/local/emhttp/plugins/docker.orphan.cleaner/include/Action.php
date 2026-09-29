@@ -181,34 +181,27 @@ try {
                 continue;
             }
             $orphan = $orphanMap[$id];
+            // Label + size repeated on every result row so the results table
+            // reads on its own without cross-referencing the main table.
+            $base = [
+                'tags' => $orphan['tags'],
+                'digestLabel' => $orphan['digestLabel'],
+                'size' => $orphan['size'],
+                'humanSize' => $orphan['humanSize'],
+            ];
             if ($orphan['class'] === 'pinned') {
-                $results[] = [
-                    'id' => $id,
-                    'status' => 'refused',
-                    'message' => 'pinned',
-                    'tags' => $orphan['tags'],
-                ];
+                $results[] = ['id' => $id, 'status' => 'refused', 'message' => 'pinned'] + $base;
                 continue;
             }
             if ($dryRun) {
-                $results[] = [
-                    'id' => $id,
-                    'status' => 'would-delete',
-                    'tags' => $orphan['tags'],
-                    'size' => $orphan['size'],
-                ];
+                $results[] = ['id' => $id, 'status' => 'would-delete'] + $base;
                 continue;
             }
             try {
                 $api->removeImage($id, false);
                 Logger::log('deleted image ' . $id . ' tags=' . implode(',', $orphan['tags'])
                     . ' size=' . $orphan['size'] . ' result=deleted');
-                $results[] = [
-                    'id' => $id,
-                    'status' => 'deleted',
-                    'tags' => $orphan['tags'],
-                    'size' => $orphan['size'],
-                ];
+                $results[] = ['id' => $id, 'status' => 'deleted'] + $base;
             } catch (DockerApiException $e) {
                 $status = $e->status();
                 $mapped = 'refused';
@@ -219,12 +212,7 @@ try {
                 }
                 Logger::log('delete image ' . $id . ' result=' . $mapped
                     . ' http=' . $status . ' message=' . $e->getMessage());
-                $results[] = [
-                    'id' => $id,
-                    'status' => $mapped,
-                    'message' => $e->getMessage(),
-                    'tags' => $orphan['tags'],
-                ];
+                $results[] = ['id' => $id, 'status' => $mapped, 'message' => $e->getMessage()] + $base;
             }
         }
 
