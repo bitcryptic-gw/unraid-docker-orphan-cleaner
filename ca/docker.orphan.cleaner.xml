@@ -1,34 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Community Applications plugin listing entry (PluginEntry).
+  Community Applications plugin wrapper for docker.orphan.cleaner.
 
-  This file is NOT published in phase 1. It lives here for review only.
-  Phase 2 (needs Gary's explicit go-ahead) places it in the CA registration
-  repository. Not to be confused with bitcryptic-gw/unraid-templates, which is
-  the branch-protected CA hub and must not be touched directly.
+  Format follows the current Community Apps submission docs
+  (https://ca.unraid.net/submit/help/repository-xml and
+   https://ca.unraid.net/submit/help/xml-field-reference): root <Plugin>,
+   minimum <PluginURL> + <Name>, recommended <Overview>, <Support>, <Project>,
+   <Category> and <Icon>.
 
-  Once a forum support thread exists, add a <Support> URL pointing at it (CA
-  requires a support thread before listing). TemplateURL is intentionally
-  omitted until the CA registration location is decided.
+  The <PluginURL> here must match the pluginURL attribute in the .plg exactly.
+
+  Placeholders that only resolve once Gary has acted:
+    @@SUPPORT_URL@@            forum support-thread URL (Stage B)
+    @@SCREENSHOT_MAIN@@        screenshot URLs (Gary captures; optional)
+    @@SCREENSHOT_CONFIRM@@
+    @@SCREENSHOT_RESULTS@@
+
+  This file is not published. For a separate-repo submission it is copied to
+  plugins/docker.orphan.cleaner.xml (starter layout) in Stage B.
 -->
-<PluginEntry>
+<Plugin>
   <Name>Docker Orphan Cleaner</Name>
-  <Author>bitcryptic-gw</Author>
-  <Category>Tools:Utilities System:Utilities</Category>
-  <PluginURL>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/plugin/docker.orphan.cleaner.plg</PluginURL>
-  <Support>https://github.com/bitcryptic-gw/unraid-docker-orphan-cleaner/issues</Support>
-  <Project>https://github.com/bitcryptic-gw/unraid-docker-orphan-cleaner</Project>
-  <Icon>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/src/usr/local/emhttp/plugins/docker.orphan.cleaner/images/icon.png</Icon>
   <Overview>
-    Lists Docker images that no container references (orphan images) and lets
-    you remove them in bulk instead of one at a time. Each orphan is classified
-    by how safe it is to remove: pinned (never), referenced by a leftover
-    Unraid template, referenced by a Docker Compose stack, tagged but
-    unreferenced, or untagged. Only untagged images are selected by default,
-    deletion is always confirmed, and nothing is ever force-removed. A dry-run
-    mode shows exactly what would be deleted, child images are reported instead
-    of failing a batch, and the reclaimable build cache can be viewed and
-    pruned on request.
+    Lists Docker images that no container references (orphan images) and removes
+    the selected ones in bulk, instead of one at a time from the Docker tab.
+    Superseded pulls are included. Each orphan is classified as pinned, template
+    referenced, compose referenced, tagged or untagged, and only untagged images
+    are selected by default. Dry run is on by default and enforced on the
+    server, deletions are never forced, and a scheduled run only ever removes
+    untagged images past a minimum age. The reclaimable build cache is shown and
+    can be pruned on request.
   </Overview>
+  <PluginURL>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/plugin/docker.orphan.cleaner.plg</PluginURL>
+  <PluginAuthor>bitcryptic-gw</PluginAuthor>
+  <Support>@@SUPPORT_URL@@</Support>
+  <Project>https://github.com/bitcryptic-gw/unraid-docker-orphan-cleaner</Project>
+  <ReadMe>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/README.md</ReadMe>
+  <Category>Tools:System</Category>
+  <Icon>https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/src/usr/local/emhttp/plugins/docker.orphan.cleaner/images/icon.png</Icon>
+  <License>MIT</License>
   <MinVer>7.0.0</MinVer>
-</PluginEntry>
+  <Beta>false</Beta>
+  <Screenshot>@@SCREENSHOT_MAIN@@</Screenshot>
+  <Screenshot>@@SCREENSHOT_CONFIRM@@</Screenshot>
+  <Screenshot>@@SCREENSHOT_RESULTS@@</Screenshot>
+</Plugin>
