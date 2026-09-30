@@ -9,15 +9,15 @@ the selected images in bulk. Unraid only offers one-at-a-time removal.
 > wrapper lives in [`plugins/`](plugins/) and is not published until CA approves
 > it.
 
-## Install (manual, for testing)
+## Install
 
-Plugins ▸ Install Plugin, and paste:
+Available in Community Applications: Apps tab, search "Docker Orphan Cleaner".
 
-```
-https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/plugin/docker.orphan.cleaner.plg
-```
+To install manually instead, go to Plugins ▸ Install Plugin and paste:
 
-Requires Unraid 7.0.0 or newer. The plugin appears as a tile under
+    https://raw.githubusercontent.com/bitcryptic-gw/unraid-docker-orphan-cleaner/main/plugin/docker.orphan.cleaner.plg
+
+Requires Unraid 7.0.0 or newer (tested on 7.3.2). The plugin appears as a tile under
 **Settings ▸ User Utilities**. Settings are on the same page.
 
 ## What it does
@@ -72,7 +72,7 @@ src/usr/local/emhttp/plugins/docker.orphan.cleaner/
     scripts/prune.php                    detached build-cache prune worker
     images/icon.png                      plugin icon
     README.md
-plugins/docker.orphan.cleaner.xml        CA plugin wrapper (submission-ready)
+plugins/docker.orphan.cleaner.xml        CA plugin wrapper
 ca_profile.xml                           CA repository profile (required)
 build/mkpkg.sh                           builds the .txz, stamps the .plg
 build/mkpkg.py                           deterministic packaging
