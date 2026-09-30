@@ -4,11 +4,6 @@ An Unraid plugin, `docker.orphan.cleaner`, that lists Docker images no
 container references, classifies how safe each one is to remove, and deletes
 the selected images in bulk. Unraid only offers one-at-a-time removal.
 
-> Status: **submission-ready**. Releases are published; the plugin is being
-> submitted to Community Applications, so it is not yet listed there. The CA
-> wrapper lives in [`plugins/`](plugins/) and is not published until CA approves
-> it.
-
 ## Install
 
 Available in Community Applications: Apps tab, search "Docker Orphan Cleaner".
